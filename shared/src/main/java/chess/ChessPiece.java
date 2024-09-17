@@ -1,7 +1,7 @@
 package chess;
 
-import java.util.AbstractCollection;
-import java.util.ArrayList;
+
+import chess.Rules.*;
 import java.util.Collection;
 import java.util.Objects;
 
@@ -57,10 +57,15 @@ public class ChessPiece {
      * @return Collection of valid moves
      */
     public Collection<ChessMove> pieceMoves(ChessBoard board, ChessPosition myPosition) {
-      this.board=board;
-      this.myPosition=myPosition;
-      return new ArrayList<>();
-    }
+    return switch (type) {
+      case KING -> KingMoveRules//.getMoves(board, myPosition);
+      case QUEEN -> QueenMoveRules//.getMoves(board, myPosition);
+      case BISHOP -> BishopMoveRules//.getMoves(board, myPosition);
+      case KNIGHT -> KnightMoveRules//.getMoves(board, myPosition);
+      case ROOK -> RookMoveRules//.getMoves(board, myPosition);
+      case PAWN -> PawnMoveRules//.getMoves(board, myPosition);
+    };
+  }
 
   @Override
   public boolean equals(Object o) {
