@@ -7,52 +7,41 @@ import java.util.Collection;
 public class KnightMoveRules {
 
   /**
-   * Returns all valid moves for a rook on the given board from the given position.
+   * Returns all valid moves for a knight on the given board from the given position.
    *
    * @param board The current chessboard
-   * @param position The position of the rook
-   * @return A collection of valid moves for the rook
+   * @param position The position of the knight
+   * @return A collection of valid moves for the knight
    */
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
     Collection<ChessMove> validMoves = new ArrayList<>();
-    ChessPiece rook = board.getPiece(position);
+    ChessPiece knight = board.getPiece(position);
 
-    if (rook == null || rook.getPieceType() != ChessPiece.PieceType.ROOK) {
+    if (knight == null || knight.getPieceType() != ChessPiece.PieceType.KNIGHT) {
       return validMoves;
     }
 
-    int[][] directions = {
-            {1, 0},
-            {-1, 0},
-            {0, 1},
-            {0, -1}
+    int[][] knightMoves = {
+            {2, 1}, {2, -1},
+            {-2, 1}, {-2, -1},
+            {1, 2}, {1, -2},
+            {-1, 2}, {-1, -2}
     };
 
-    for (int[] direction : directions) {
-      int dRow = direction[0];
-      int dCol = direction[1];
-      int currentRow = position.getRow();
-      int currentCol = position.getColumn();
+    for (int[] move : knightMoves) {
+      int newRow = position.getRow() + move[0];
+      int newCol = position.getColumn() + move[1];
 
-      while (true) {
-        currentRow += dRow;
-        currentCol += dCol;
-
-        if (currentRow < 1 || currentRow > 8 || currentCol < 1 || currentCol > 8) {
-          break;
-        }
-        ChessPosition newPosition = new ChessPosition(currentRow, currentCol);
+      if (newRow >= 1 && newRow <= 8 && newCol >= 1 && newCol <= 8) {
+        ChessPosition newPosition = new ChessPosition(newRow, newCol);
         ChessPiece occupyingPiece = board.getPiece(newPosition);
-        if (occupyingPiece == null) {
+
+        if (occupyingPiece == null || occupyingPiece.getTeamColor() != knight.getTeamColor()) {
           validMoves.add(new ChessMove(position, newPosition, null));
-        } else if (occupyingPiece.getTeamColor() != rook.getTeamColor()) {
-          validMoves.add(new ChessMove(position, newPosition, null));
-          break;
-        } else {
-          break;
         }
       }
     }
+
     return validMoves;
   }
 }
