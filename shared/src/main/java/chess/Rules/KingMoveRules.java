@@ -7,52 +7,56 @@ import java.util.Collection;
 public class KingMoveRules {
 
   /**
-   * Returns all valid moves for a rook on the given board from the given position.
+   * Returns all valid king moves from the given position on the given board.
+   * The king moves one square in any direction: horizontally, vertically, or diagonally.
    *
-   * @param board The current chessboard
-   * @param position The position of the rook
-   * @return A collection of valid moves for the rook
+   * @param board        the chess board
+   * @param myPosition   the current position of the king
+   * @return a collection of valid moves for the king
    */
-  public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
-    Collection<ChessMove> validMoves = new ArrayList<>();
-    ChessPiece rook = board.getPiece(position);
+  public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition myPosition) {
+    Collection<ChessMove> moves = new ArrayList<>();
+    ChessPiece king = board.getPiece(myPosition);
 
-    if (rook == null || rook.getPieceType() != ChessPiece.PieceType.ROOK) {
-      return validMoves;
+    if (king == null || king.getPieceType() != ChessPiece.PieceType.KING) {
+      return moves;
     }
 
     int[][] directions = {
-            {1, 0},
             {-1, 0},
+            {1, 0},
+            {0, -1},
             {0, 1},
-            {0, -1}
+            {-1, -1},
+            {-1, 1},
+            {1, -1},
+            {1, 1}
     };
 
     for (int[] direction : directions) {
-      int dRow = direction[0];
-      int dCol = direction[1];
-      int currentRow = position.getRow();
-      int currentCol = position.getColumn();
+      int newRow = myPosition.getRow() + direction[0];
+      int newCol = myPosition.getColumn() + direction[1];
 
-      while (true) {
-        currentRow += dRow;
-        currentCol += dCol;
+      if (isInBounds(newRow, newCol)) {
+        ChessPosition newPosition = new ChessPosition(newRow, newCol);
+        ChessPiece pieceAtNewPosition = board.getPiece(newPosition);
 
-        if (currentRow < 1 || currentRow > 8 || currentCol < 1 || currentCol > 8) {
-          break;
-        }
-        ChessPosition newPosition = new ChessPosition(currentRow, currentCol);
-        ChessPiece occupyingPiece = board.getPiece(newPosition);
-        if (occupyingPiece == null) {
-          validMoves.add(new ChessMove(position, newPosition, null));
-        } else if (occupyingPiece.getTeamColor() != rook.getTeamColor()) {
-          validMoves.add(new ChessMove(position, newPosition, null));
-          break;
-        } else {
-          break;
+        if (pieceAtNewPosition == null || pieceAtNewPosition.getTeamColor() != king.getTeamColor()) {
+          moves.add(new ChessMove(myPosition, newPosition, null));  // Regular move, no promotion
         }
       }
     }
-    return validMoves;
+    return moves;
+  }
+
+  /**
+   * Helper method to check if the given row and column are within the bounds of the chessboard.
+   *
+   * @param row the row to check
+   * @param col the column to check
+   * @return true if the position is within bounds, false otherwise
+   */
+  private static boolean isInBounds(int row, int col) {
+    return row >= 1 && row <= 8 && col >= 1 && col <= 8;
   }
 }
