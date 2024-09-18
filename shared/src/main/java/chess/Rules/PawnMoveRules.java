@@ -6,14 +6,6 @@ import java.util.Collection;
 
 public class PawnMoveRules {
 
-  /**
-   * Returns all valid pawn moves from the given position on the given board.
-   * Pawns move differently depending on the team (White moves up, Black moves down).
-   *
-   * @param board        the chess board
-   * @param myPosition   the current position of the pawn
-   * @return a collection of valid moves for the pawn
-   */
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition myPosition) {
     Collection<ChessMove> moves = new ArrayList<>();
     ChessPiece pawn = board.getPiece(myPosition);

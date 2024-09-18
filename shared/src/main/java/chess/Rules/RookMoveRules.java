@@ -6,13 +6,6 @@ import java.util.Collection;
 
 public class RookMoveRules {
 
-  /**
-   * Returns all valid moves for a rook on the given board from the given position.
-   *
-   * @param board The current chessboard
-   * @param position The position of the rook
-   * @return A collection of valid moves for the rook
-   */
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece rook = board.getPiece(position);

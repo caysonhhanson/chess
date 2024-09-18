@@ -5,14 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 public class BishopMoveRules {
-
-  /**
-   * Returns all valid moves for a bishop on the given board from the given position.
-   *
-   * @param board The current chessboard
-   * @param position The position of the bishop
-   * @return A collection of valid moves for the bishop
-   */
+  
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece bishop = board.getPiece(position);

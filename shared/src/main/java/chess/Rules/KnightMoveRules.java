@@ -6,13 +6,6 @@ import java.util.Collection;
 
 public class KnightMoveRules {
 
-  /**
-   * Returns all valid moves for a knight on the given board from the given position.
-   *
-   * @param board The current chessboard
-   * @param position The position of the knight
-   * @return A collection of valid moves for the knight
-   */
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece knight = board.getPiece(position);
