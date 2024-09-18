@@ -17,10 +17,6 @@ public class BishopMoveRules {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece bishop = board.getPiece(position);
 
-    if (bishop == null || bishop.getPieceType() != ChessPiece.PieceType.BISHOP) {
-      return validMoves;
-    }
-
     int[][] directions = {
             {1, 1},
             {1, -1},

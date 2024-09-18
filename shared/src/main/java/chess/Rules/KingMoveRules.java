@@ -18,10 +18,6 @@ public class KingMoveRules {
     Collection<ChessMove> moves = new ArrayList<>();
     ChessPiece king = board.getPiece(myPosition);
 
-    if (king == null || king.getPieceType() != ChessPiece.PieceType.KING) {
-      return moves;
-    }
-
     int[][] directions = {
             {-1, 0},
             {1, 0},

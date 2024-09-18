@@ -17,10 +17,6 @@ public class KnightMoveRules {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece knight = board.getPiece(position);
 
-    if (knight == null || knight.getPieceType() != ChessPiece.PieceType.KNIGHT) {
-      return validMoves;
-    }
-
     int[][] knightMoves = {
             {2, 1}, {2, -1},
             {-2, 1}, {-2, -1},

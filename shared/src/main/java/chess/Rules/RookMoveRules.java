@@ -17,10 +17,6 @@ public class RookMoveRules {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece rook = board.getPiece(position);
 
-    if (rook == null || rook.getPieceType() != ChessPiece.PieceType.ROOK) {
-      return validMoves;
-    }
-
     int[][] directions = {
             {1, 0},
             {-1, 0},
