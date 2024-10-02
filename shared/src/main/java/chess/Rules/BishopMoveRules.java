@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 public class BishopMoveRules {
-  
+
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
     Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece bishop = board.getPiece(position);

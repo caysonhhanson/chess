@@ -7,49 +7,49 @@ import java.util.Collection;
 public class PawnMoveRules {
 
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition myPosition) {
-    Collection<ChessMove> moves = new ArrayList<>();
+    Collection<ChessMove> validMoves = new ArrayList<>();
     ChessPiece pawn = board.getPiece(myPosition);
 
     int direction = (pawn.getTeamColor() == ChessGame.TeamColor.WHITE) ? 1 : -1;
     int startRow = (pawn.getTeamColor() == ChessGame.TeamColor.WHITE) ? 2 : 7;
     int promotionRow = (pawn.getTeamColor() == ChessGame.TeamColor.WHITE) ? 8 : 1;
 
-    addMoveIfValid(board, moves, pawn, myPosition, myPosition.getRow() + direction, myPosition.getColumn(), false, promotionRow);
+    addMoveIfValid(board, validMoves, pawn, myPosition, myPosition.getRow() + direction, myPosition.getColumn(), false, promotionRow);
 
     if (myPosition.getRow() == startRow) {
       ChessPosition oneSquareAhead = new ChessPosition(myPosition.getRow() + direction, myPosition.getColumn());
       if (board.getPiece(oneSquareAhead) == null) {
-        addMoveIfValid(board, moves, pawn, myPosition, myPosition.getRow() + 2 * direction, myPosition.getColumn(), false, promotionRow);
+        addMoveIfValid(board, validMoves, pawn, myPosition, myPosition.getRow() + 2 * direction, myPosition.getColumn(), false, promotionRow);
       }
     }
-    addMoveIfValid(board, moves, pawn, myPosition, myPosition.getRow() + direction, myPosition.getColumn() - 1, true, promotionRow);
-    addMoveIfValid(board, moves, pawn, myPosition, myPosition.getRow() + direction, myPosition.getColumn() + 1, true, promotionRow);
+    addMoveIfValid(board, validMoves, pawn, myPosition, myPosition.getRow() + direction, myPosition.getColumn() - 1, true, promotionRow);
+    addMoveIfValid(board, validMoves, pawn, myPosition, myPosition.getRow() + direction, myPosition.getColumn() + 1, true, promotionRow);
 
-    return moves;
+    return validMoves;
   }
 
-  private static void addMoveIfValid(ChessBoard board, Collection<ChessMove> moves, ChessPiece pawn, ChessPosition oldPosition, int toRow, int toColumn, boolean isCapture, int promotionRow) {
+  private static void addMoveIfValid(ChessBoard board, Collection<ChessMove> validMoves, ChessPiece pawn, ChessPosition oldPosition, int toRow, int toColumn, boolean isCapture, int promotionRow) {
     if (isInBounds(toRow, toColumn)) {
       ChessPosition newPosition = new ChessPosition(toRow, toColumn);
       ChessPiece pieceAtNewPosition = board.getPiece(newPosition);
 
       if (isCapture && pieceAtNewPosition != null && pieceAtNewPosition.getTeamColor() != pawn.getTeamColor()) {
-        addPromotionMove(moves, oldPosition, newPosition, toRow, promotionRow);
+        addPromotionMove(validMoves, oldPosition, newPosition, toRow, promotionRow);
       }
       else if (!isCapture && pieceAtNewPosition == null) {
-        addPromotionMove(moves, oldPosition, newPosition, toRow, promotionRow);
+        addPromotionMove(validMoves, oldPosition, newPosition, toRow, promotionRow);
       }
     }
   }
 
-  private static void addPromotionMove(Collection<ChessMove> moves, ChessPosition from, ChessPosition newPosition, int toRow, int promotionRow) {
+  private static void addPromotionMove(Collection<ChessMove> validMoves, ChessPosition from, ChessPosition newPosition, int toRow, int promotionRow) {
     if (toRow == promotionRow) {
-      moves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.QUEEN));
-      moves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.ROOK));
-      moves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.KNIGHT));
-      moves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.BISHOP));
+      validMoves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.QUEEN));
+      validMoves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.ROOK));
+      validMoves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.KNIGHT));
+      validMoves.add(new ChessMove(from, newPosition, ChessPiece.PieceType.BISHOP));
     } else {
-      moves.add(new ChessMove(from, newPosition, null));
+      validMoves.add(new ChessMove(from, newPosition, null));
     }
   }
 
