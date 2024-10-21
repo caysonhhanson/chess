@@ -1,6 +1,5 @@
-package dataAccess;
+package dataaccess;
 
-import chess.ChessGame;
 import dataaccess.DataAccess;
 import dataaccess.DataAccessException;
 import model.*;
@@ -13,7 +12,7 @@ public class MemoryDataAccess implements DataAccess {
   private int nextGameId = 1;
 
   @Override
-  public void clear() {
+  public void clear() throws DataAccessException {
     users.clear();
     games.clear();
     auths.clear();
@@ -29,25 +28,26 @@ public class MemoryDataAccess implements DataAccess {
   }
 
   @Override
-  public UserData getUser(String username) {
+  public UserData getUser(String username) throws DataAccessException {
     return users.get(username);
   }
 
   @Override
-  public int createGame(String gameName) {
+  public void createGame(GameData game) throws DataAccessException {
     int gameId = nextGameId++;
-    games.put(gameId, new GameData(gameId, null, null, gameName, new ChessGame()));
-    return gameId;
+    GameData newGame = new GameData(gameId, game.whiteUsername(), game.blackUsername(),
+            game.gameName(), game.game());
+    games.put(gameId, newGame);
   }
 
   @Override
-  public GameData getGame(int gameID) {
-    return games.get(gameID);
+  public GameData getGame(int gameId) throws DataAccessException {
+    return games.get(gameId);
   }
 
   @Override
-  public List<GameData> listGames() {
-    return new ArrayList<>(games.values());
+  public Collection<GameData> listGames() throws DataAccessException {
+    return games.values();
   }
 
   @Override
@@ -59,19 +59,17 @@ public class MemoryDataAccess implements DataAccess {
   }
 
   @Override
-  public String createAuth(String username) {
-    String authToken = UUID.randomUUID().toString();
-    auths.put(authToken, new AuthData(authToken, username));
-    return authToken;
+  public void createAuth(AuthData auth) throws DataAccessException {
+    auths.put(auth.authToken(), auth);
   }
 
   @Override
-  public AuthData getAuth(String authToken) {
+  public AuthData getAuth(String authToken) throws DataAccessException {
     return auths.get(authToken);
   }
 
   @Override
-  public void deleteAuth(String authToken) {
+  public void deleteAuth(String authToken) throws DataAccessException {
     auths.remove(authToken);
   }
 }

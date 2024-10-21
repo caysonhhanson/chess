@@ -19,5 +19,3 @@ public class Server {
         Spark.awaitStop();
     }
 }
-
-// UserHandler, GameHandler, and AdminHandler classes remain the same as in the previous implementation
