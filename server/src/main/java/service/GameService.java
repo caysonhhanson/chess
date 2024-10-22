@@ -42,4 +42,24 @@ public class GameService {
 
     return auth;
   }
+  public AuthData login(String username, String password) throws DataAccessException {
+    // Validate input parameters
+    if (username == null || password == null ||
+            username.isEmpty() || password.isEmpty()) {
+      throw new DataAccessException("Error: bad request");
+    }
+
+    // Get the user
+    UserData user = dataAccess.getUser(username);
+    if (user == null || !user.password().equals(password)) {
+      throw new DataAccessException("Error: unauthorized");
+    }
+
+    // Create and store new auth token
+    String authToken = UUID.randomUUID().toString();
+    AuthData auth = new AuthData(username, authToken);
+    dataAccess.createAuth(auth);
+
+    return auth;
+  }
 }
