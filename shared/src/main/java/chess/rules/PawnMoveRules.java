@@ -28,7 +28,8 @@ public class PawnMoveRules {
     return validMoves;
   }
 
-  private static void addMoveIfValid(ChessBoard board, Collection<ChessMove> validMoves, ChessPiece pawn, ChessPosition oldPosition, int toRow, int toColumn, boolean isCapture, int promotionRow) {
+  private static void addMoveIfValid(ChessBoard board, Collection<ChessMove> validMoves,
+                                     ChessPiece pawn, ChessPosition oldPosition, int toRow, int toColumn, boolean isCapture, int promotionRow) {
     if (isInBounds(toRow, toColumn)) {
       ChessPosition newPosition = new ChessPosition(toRow, toColumn);
       ChessPiece pieceAtNewPosition = board.getPiece(newPosition);
