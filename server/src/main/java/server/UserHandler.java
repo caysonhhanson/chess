@@ -1,5 +1,6 @@
 package server;
 
+import dataaccess.*;
 import com.google.gson.Gson;
 import dataaccess.DataAccessException;
 import model.AuthData;
@@ -71,13 +72,10 @@ public class UserHandler {
 
   public Object handleLogout(Request req, Response res) {
     try {
-      // Get auth token from header
       String authToken = req.headers("authorization");
 
-      // Call service to logout
-      userService.logout(new AuthData(authToken, null));
+      userService.logout(new AuthData(null, authToken));
 
-      // Return success response
       res.status(200);
       return "{}";
     } catch (DataAccessException e) {
