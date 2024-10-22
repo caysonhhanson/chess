@@ -62,7 +62,7 @@ public class GameService {
     }
 
     if (playerColor == null) {
-      return;
+      throw new BadRequestException("Error: bad request");
     }
 
     switch (playerColor.toUpperCase()) {
