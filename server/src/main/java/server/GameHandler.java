@@ -85,6 +85,11 @@ public class GameHandler {
       record JoinGameRequest(String playerColor, Integer gameID) { }
       var joinRequest = gson.fromJson(req.body(), JoinGameRequest.class);
 
+      if (joinRequest.gameID() == null) {
+        res.status(400);
+        return gson.toJson(Map.of("message", "Error: bad request"));
+      }
+
       gameService.joinGame(authToken, joinRequest.playerColor(), joinRequest.gameID());
       res.status(200);
       return "{}";

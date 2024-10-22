@@ -40,7 +40,7 @@ public class MemoryDataAccess implements DataAccess {
   }
 
   @Override
-  public GameData getGame(int gameId) throws DataAccessException {
+  public GameData getGame(int gameId) {
     return games.get(gameId);
   }
 

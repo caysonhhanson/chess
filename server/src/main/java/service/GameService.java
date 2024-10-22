@@ -57,6 +57,7 @@ public class GameService {
     }
 
     GameData game = dataAccess.getGame(gameID);
+
     if (game == null) {
       throw new BadRequestException("Error: bad request");
     }
