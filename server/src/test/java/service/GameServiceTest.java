@@ -32,7 +32,7 @@ public class GameServiceTest {
   }
 
   @Test
-  public void testListGames_Success() throws DataAccessException, UnauthorizedException {
+  public void testListGamesSuccess() throws DataAccessException, UnauthorizedException {
     // Create a test auth token
     String authToken = "test-auth-token";
     String username = "testUser";
@@ -53,7 +53,7 @@ public class GameServiceTest {
   }
 
   @Test
-  public void testListGames_Unauthorized() {
+  public void testListGamesUnauthorized() {
     // Test with invalid auth token
     String invalidAuthToken = "invalid-token";
 
@@ -63,7 +63,7 @@ public class GameServiceTest {
     });
   }
   @Test
-  public void testCreateGame_Success() throws DataAccessException, UnauthorizedException, BadRequestException {
+  public void testCreateGameSuccess() throws DataAccessException, UnauthorizedException, BadRequestException {
     // Create a test auth token
     String authToken = "test-auth-token";
     String username = "testUser";
@@ -87,7 +87,7 @@ public class GameServiceTest {
   }
 
   @Test
-  public void testCreateGame_Unauthorized() {
+  public void testCreateGameUnauthorized() {
     String invalidAuthToken = "invalid-token";
     String gameName = "Test Game";
 
@@ -97,7 +97,7 @@ public class GameServiceTest {
   }
 
   @Test
-  public void testCreateGame_BadRequest() {
+  public void testCreateGameBadRequest() {
     String authToken = "test-auth-token";
 
     assertThrows(BadRequestException.class, () -> {
