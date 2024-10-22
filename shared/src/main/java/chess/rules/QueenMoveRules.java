@@ -1,16 +1,20 @@
-package chess.Rules;
+package chess.rules;
 
 import chess.*;
 import java.util.ArrayList;
 import java.util.Collection;
 
-public class BishopMoveRules {
+public class QueenMoveRules {
 
   public static Collection<ChessMove> getMoves(ChessBoard board, ChessPosition position) {
     Collection<ChessMove> validMoves = new ArrayList<>();
-    ChessPiece bishop = board.getPiece(position);
+    ChessPiece queen = board.getPiece(position);
 
     int[][] directions = {
+            {1, 0},
+            {-1, 0},
+            {0, 1},
+            {0, -1},
             {1, 1},
             {1, -1},
             {-1, 1},
@@ -18,25 +22,26 @@ public class BishopMoveRules {
     };
 
     for (int[] direction : directions) {
-      int dRow = direction[0];
-      int dCol = direction[1];
+      int directionRow = direction[0];
+      int directionCol = direction[1];
       int currentRow = position.getRow();
       int currentCol = position.getColumn();
 
       while (true) {
-        currentRow += dRow;
-        currentCol += dCol;
+        currentRow += directionRow;
+        currentCol += directionCol;
 
         if (currentRow < 1 || currentRow > 8 || currentCol < 1 || currentCol > 8) {
           break;
         }
 
         ChessPosition newPosition = new ChessPosition(currentRow, currentCol);
+
         ChessPiece occupyingPiece = board.getPiece(newPosition);
 
         if (occupyingPiece == null) {
           validMoves.add(new ChessMove(position, newPosition, null));
-        } else if (occupyingPiece.getTeamColor() != bishop.getTeamColor()) {
+        } else if (occupyingPiece.getTeamColor() != queen.getTeamColor()) {
           validMoves.add(new ChessMove(position, newPosition, null));
           break;
         } else {
@@ -44,7 +49,6 @@ public class BishopMoveRules {
         }
       }
     }
-
     return validMoves;
   }
 }

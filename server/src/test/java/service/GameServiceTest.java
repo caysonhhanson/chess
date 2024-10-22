@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class GameServiceTest {
   private GameService gameService;
   private DataAccess dataAccess;
-  private UserService userService; // Needed for setup
+  private UserService userService;
 
   @BeforeEach
   public void setUp() {
