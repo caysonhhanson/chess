@@ -44,16 +44,26 @@ public class UserService {
     }
 
     // Get the user
-    UserData user = dataAccess.getUser(username);
+    UserData user=dataAccess.getUser(username);
     if (user == null || !user.password().equals(password)) {
       throw new DataAccessException("Error: unauthorized");
     }
 
     // Create and store new auth token
-    String authToken = UUID.randomUUID().toString();
-    AuthData auth = new AuthData(username, authToken);
+    String authToken=UUID.randomUUID().toString();
+    AuthData auth=new AuthData(username, authToken);
     dataAccess.createAuth(auth);
 
     return auth;
   }
-}
+
+  public void logout(AuthData authData) throws DataAccessException {
+
+      if (dataAccess.getAuth(authData.authToken()) == null) {
+        throw new DataAccessException("Error: unauthorized");
+      }
+
+      // Delete the auth token
+      dataAccess.deleteAuth(authData.authToken());
+    }
+  }

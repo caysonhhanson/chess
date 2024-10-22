@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class UserServiceTest {
   private UserService userService;
   private DataAccess dataAccess;
+  private AuthData validAuth;
+
 
   @BeforeEach
   public void setUp() {
@@ -138,5 +140,20 @@ public class UserServiceTest {
     // Test empty password
     assertThrows(DataAccessException.class, () ->
             userService.login("testUser", ""));
+  }
+  @Test
+  void logoutSuccess() throws DataAccessException {
+    // Test successful logout with valid auth token
+    assertDoesNotThrow(() -> userService.logout(validAuth));
+
+    // Verify the auth token is no longer valid by trying to use it again
+    assertThrows(DataAccessException.class, () -> userService.logout(validAuth));
+  }
+
+  @Test
+  void logoutFailInvalidAuth() {
+    // Test with invalid auth token
+    AuthData invalidAuth = new AuthData("invalidToken", "testUser");
+    assertThrows(DataAccessException.class, () -> userService.logout(invalidAuth));
   }
 }
