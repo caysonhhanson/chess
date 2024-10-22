@@ -10,18 +10,19 @@ public class Server {
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
 
-        // Create services and handlers
         var dataAccess = new MemoryDataAccess();
         var userService = new UserService(dataAccess);
         var gameService = new GameService(dataAccess);
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
 
-        // Register endpoints
+        Spark.delete("/db", gameHandler::handleClear);
         Spark.post("/user", userHandler::handleRegister);
         Spark.post("/session", userHandler::handleLogin);
         Spark.delete("/session", userHandler::handleLogout);
         Spark.get("/game", gameHandler::handleListGames);
+        Spark.post("/game", gameHandler::handleCreateGame);
+        Spark.put("/game", gameHandler::handleJoinGame);
 
         Spark.awaitInitialization();
         return Spark.port();

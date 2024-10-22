@@ -62,4 +62,54 @@ public class GameServiceTest {
       gameService.listGames(invalidAuthToken);
     });
   }
+  @Test
+  public void testCreateGame_Success() throws DataAccessException, UnauthorizedException, BadRequestException {
+    // Create a test auth token
+    String authToken = "test-auth-token";
+    String username = "testUser";
+    dataAccess.createAuth(new AuthData(username, authToken));
+
+    // Create a game
+    String gameName = "Test Game";
+    var result = gameService.createGame(authToken, gameName);
+
+    // Verify the game was created
+    assertNotNull(result);
+    assertTrue(result.gameID() > 0);
+
+    // Verify the game exists in the database
+    GameData game = dataAccess.getGame(result.gameID());
+    assertNotNull(game);
+    assertEquals(gameName, game.gameName());
+    assertNull(game.whiteUsername());
+    assertNull(game.blackUsername());
+    assertNotNull(game.game());
+  }
+
+  @Test
+  public void testCreateGame_Unauthorized() {
+    String invalidAuthToken = "invalid-token";
+    String gameName = "Test Game";
+
+    assertThrows(UnauthorizedException.class, () -> {
+      gameService.createGame(invalidAuthToken, gameName);
+    });
+  }
+
+  @Test
+  public void testCreateGame_BadRequest() {
+    String authToken = "test-auth-token";
+
+    assertThrows(BadRequestException.class, () -> {
+      gameService.createGame(authToken, null);
+    });
+
+    assertThrows(BadRequestException.class, () -> {
+      gameService.createGame(authToken, "");
+    });
+
+    assertThrows(BadRequestException.class, () -> {
+      gameService.createGame(authToken, "   ");
+    });
+  }
 }
