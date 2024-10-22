@@ -25,17 +25,14 @@ public class UserHandler {
 
   public Object handleRegister(Request req, Response res) {
     try {
-      // Parse request body
       RegisterRequest registerRequest = gson.fromJson(req.body(), RegisterRequest.class);
 
-      // Call service to register user
       AuthData auth = userService.register(
               registerRequest.username(),
               registerRequest.password(),
               registerRequest.email()
       );
 
-      // Create and return success response
       res.status(200);
       return gson.toJson(new AuthResponse(auth.username(), auth.authToken()));
     } catch (DataAccessException e) {
@@ -49,16 +46,13 @@ public class UserHandler {
 
   public Object handleLogin(Request req, Response res) {
     try {
-      // Parse request body
       LoginRequest loginRequest = gson.fromJson(req.body(), LoginRequest.class);
 
-      // Call service to login user
       AuthData auth = userService.login(
               loginRequest.username(),
               loginRequest.password()
       );
 
-      // Create and return success response
       res.status(200);
       return gson.toJson(new AuthResponse(auth.username(), auth.authToken()));
     } catch (DataAccessException e) {

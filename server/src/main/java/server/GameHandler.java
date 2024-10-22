@@ -52,21 +52,17 @@ public class GameHandler {
 
   public Object handleCreateGame(Request req, Response res) {
     try {
-      // Get auth token from header
       String authToken = req.headers("authorization");
       if (authToken == null) {
         res.status(401);
         return gson.toJson(Map.of("message", "Error: unauthorized"));
       }
 
-      // Parse request body
       record CreateGameRequest(String gameName) {}
       var request = gson.fromJson(req.body(), CreateGameRequest.class);
 
-      // Create the game
       var result = gameService.createGame(authToken, request.gameName());
 
-      // Return success response
       res.status(200);
       return gson.toJson(result);
     } catch (UnauthorizedException e) {
@@ -84,10 +80,8 @@ public class GameHandler {
     res.type("application/json");
 
     try {
-      // Get authToken from header
       String authToken = req.headers("authorization");
 
-      // Parse request body
       record JoinGameRequest(String playerColor, Integer gameID) { }
       var joinRequest = gson.fromJson(req.body(), JoinGameRequest.class);
 

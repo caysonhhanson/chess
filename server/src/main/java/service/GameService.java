@@ -26,7 +26,6 @@ public class GameService {
 
   public CreateGameResult createGame(String authToken, String gameName)
           throws DataAccessException, UnauthorizedException, BadRequestException {
-    // Validate inputs
     if (gameName == null || gameName.isBlank()) {
       throw new BadRequestException("Error: bad request");
     }
@@ -39,7 +38,6 @@ public class GameService {
     GameData newGame = new GameData(0, null, null, gameName, new ChessGame());
     dataAccess.createGame(newGame);
 
-    // Get the game to get its assigned ID
     Collection<GameData> games = dataAccess.listGames();
     GameData createdGame = games.stream()
             .filter(g -> g.gameName().equals(gameName))
@@ -52,24 +50,21 @@ public class GameService {
   public record CreateGameResult(int gameID) {}
   public void joinGame(String authToken, String playerColor, int gameID)
           throws DataAccessException, UnauthorizedException, BadRequestException, AlreadyTakenException {
-    // Verify auth token
+
     AuthData auth = dataAccess.getAuth(authToken);
     if (auth == null) {
       throw new UnauthorizedException("Error: unauthorized");
     }
 
-    // Verify game exists
     GameData game = dataAccess.getGame(gameID);
     if (game == null) {
       throw new BadRequestException("Error: bad request");
     }
 
-    // Handle spectator case (null playerColor means watch only)
     if (playerColor == null) {
-      return; // Successfully joined as spectator
+      return;
     }
 
-    // Validate and process color selection
     switch (playerColor.toUpperCase()) {
       case "WHITE" -> {
         if (game.whiteUsername() != null) {
@@ -88,7 +83,6 @@ public class GameService {
       default -> throw new BadRequestException("Error: bad request");
     }
 
-    // Update the game in the database
     dataAccess.updateGame(game);
   }
 }
