@@ -143,6 +143,14 @@ public class UserServiceTest {
   }
   @Test
   void logoutSuccess() throws DataAccessException {
+    // First register a test user
+    String username = "testUser";
+    String password = "password";
+    userService.register(username, password, "test@example.com");
+
+    // Login to get a valid auth token
+    AuthData validAuth = userService.login(username, password);
+
     // Test successful logout with valid auth token
     assertDoesNotThrow(() -> userService.logout(validAuth));
 
