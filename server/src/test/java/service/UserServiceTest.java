@@ -7,14 +7,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class UserServiceTest {
   private UserService userService;
-  private DataAccess dataAccess;
-  private AuthData validAuth;
-
+  private UserDAO userDAO;
+  private AuthDAO authDAO;
 
   @BeforeEach
   public void setUp() {
-    dataAccess = new MemoryDataAccess();
-    userService = new UserService(dataAccess);
+    userDAO = new MemoryUserDAO(); // Use in-memory implementation
+    authDAO = new MemoryAuthDAO(); // Use in-memory implementation
+    userService = new UserService(userDAO, authDAO); // Initialize UserService with DAOs
   }
 
   @Test
@@ -25,20 +25,20 @@ public class UserServiceTest {
 
     AuthData result = userService.register(username, password, email);
 
-    // First verify we got a valid auth result back
+    // Verify we got a valid auth result back
     assertNotNull(result);
     assertNotNull(result.authToken());
     assertEquals(username, result.username());
 
-    // Then verify the user was created in the database
-    UserData savedUser = dataAccess.getUser(username);
+    // Verify the user was created in the database
+    UserData savedUser = userDAO.getUser(username); // Use the userDAO for user retrieval
     assertNotNull(savedUser);
     assertEquals(username, savedUser.username());
     assertEquals(password, savedUser.password());
     assertEquals(email, savedUser.email());
 
-    // Finally verify the auth token was stored correctly
-    AuthData savedAuth = dataAccess.getAuth(result.authToken());
+    // Verify the auth token was stored correctly
+    AuthData savedAuth = authDAO.getAuth(result.authToken()); // Use the authDAO for auth retrieval
     assertNotNull(savedAuth);
     assertEquals(result.authToken(), savedAuth.authToken());
     assertEquals(username, savedAuth.username());
@@ -97,7 +97,7 @@ public class UserServiceTest {
     assertEquals(username, result.username());
 
     // Verify the auth token was stored correctly
-    AuthData savedAuth = dataAccess.getAuth(result.authToken());
+    AuthData savedAuth = authDAO.getAuth(result.authToken());
     assertNotNull(savedAuth);
     assertEquals(result.authToken(), savedAuth.authToken());
     assertEquals(username, savedAuth.username());
@@ -141,6 +141,7 @@ public class UserServiceTest {
     assertThrows(DataAccessException.class, () ->
             userService.login("testUser", ""));
   }
+
   @Test
   void logoutSuccess() throws DataAccessException {
     // First register a test user

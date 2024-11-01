@@ -5,10 +5,12 @@ import model.*;
 import java.util.UUID;
 
 public class UserService {
-  private final DataAccess dataAccess;
+  private final UserDAO userDAO;
+  private final AuthDAO authDAO;
 
-  public UserService(DataAccess dataAccess) {
-    this.dataAccess = dataAccess;
+  public UserService(UserDAO userDAO, AuthDAO authDAO) {
+    this.userDAO = userDAO;
+    this.authDAO = authDAO;
   }
 
   public AuthData register(String username, String password, String email) throws DataAccessException {
@@ -17,18 +19,17 @@ public class UserService {
       throw new DataAccessException("Error: bad request");
     }
 
-
-    UserData existingUser = dataAccess.getUser(username);
+    UserData existingUser = userDAO.getUser(username);
     if (existingUser != null) {
       throw new DataAccessException("Error: already taken");
     }
 
     UserData newUser = new UserData(username, password, email);
-    dataAccess.createUser(newUser);
+    userDAO.createUser(newUser);
 
     String authToken = UUID.randomUUID().toString();
     AuthData auth = new AuthData(username, authToken);
-    dataAccess.createAuth(auth);
+    authDAO.createAuth(auth);
 
     return auth;
   }
@@ -39,24 +40,23 @@ public class UserService {
       throw new DataAccessException("Error: bad request");
     }
 
-    UserData user=dataAccess.getUser(username);
+    UserData user = userDAO.getUser(username);
     if (user == null || !user.password().equals(password)) {
       throw new DataAccessException("Error: unauthorized");
     }
 
-    String authToken=UUID.randomUUID().toString();
-    AuthData auth=new AuthData(username, authToken);
-    dataAccess.createAuth(auth);
+    String authToken = UUID.randomUUID().toString();
+    AuthData auth = new AuthData(username, authToken);
+    authDAO.createAuth(auth);
 
     return auth;
   }
 
   public void logout(AuthData authData) throws DataAccessException {
-    AuthData existingAuth = dataAccess.getAuth(authData.authToken());
+    AuthData existingAuth = authDAO.getAuth(authData.authToken());
     if (existingAuth == null) {
       throw new DataAccessException("Error: unauthorized");
     }
-    dataAccess.deleteAuth(authData.authToken());
+    authDAO.deleteAuth(authData.authToken());
   }
-
 }

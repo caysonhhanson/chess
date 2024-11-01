@@ -8,14 +8,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class GameServiceTest {
   private GameService gameService;
-  private DataAccess dataAccess;
   private UserService userService;
+  private UserDAO userDAO;
+  private GameDAO gameDAO;
+  private AuthDAO authDAO;
 
   @BeforeEach
   public void setUp() {
-    dataAccess=new MemoryDataAccess();
-    gameService=new GameService(dataAccess);
-    userService=new UserService(dataAccess);
+    userDAO = new MemoryUserDAO(); // Assuming you have this DAO implemented
+    authDAO = new MemoryAuthDAO(); // Assuming you have this DAO implemented
+    gameDAO = new MemoryGameDAO(); // Assuming you have this DAO implemented
+    userService = new UserService(userDAO, authDAO);
+    gameService = new GameService(userDAO, gameDAO, authDAO);
   }
 
   @Test
@@ -27,7 +31,7 @@ public class GameServiceTest {
     gameService.clear();
 
     // Verify user no longer exists
-    UserData user=dataAccess.getUser("testUser");
+    UserData user = userDAO.getUser("testUser"); // Use userDAO for user retrieval
     assertNull(user);
   }
 
@@ -36,13 +40,13 @@ public class GameServiceTest {
     // Create a test auth token
     String authToken = "test-auth-token";
     String username = "testUser";
-    dataAccess.createAuth(new AuthData(username, authToken));
+    authDAO.createAuth(new AuthData(username, authToken)); // Use authDAO for auth creation
 
     // Create some test games
     var game1 = new GameData(0, "white1", "black1", "game1", new ChessGame());
     var game2 = new GameData(0, "white2", "black2", "game2", new ChessGame());
-    dataAccess.createGame(game1);
-    dataAccess.createGame(game2);
+    gameDAO.createGame(game1); // Use gameDAO for game creation
+    gameDAO.createGame(game2);
 
     // Get the games list
     var games = gameService.listGames(authToken);
@@ -62,12 +66,13 @@ public class GameServiceTest {
       gameService.listGames(invalidAuthToken);
     });
   }
+
   @Test
   public void testCreateGameSuccess() throws DataAccessException, UnauthorizedException, BadRequestException {
     // Create a test auth token
     String authToken = "test-auth-token";
     String username = "testUser";
-    dataAccess.createAuth(new AuthData(username, authToken));
+    authDAO.createAuth(new AuthData(username, authToken)); // Use authDAO for auth creation
 
     // Create a game
     String gameName = "Test Game";
@@ -78,7 +83,7 @@ public class GameServiceTest {
     assertTrue(result.gameID() > 0);
 
     // Verify the game exists in the database
-    GameData game = dataAccess.getGame(result.gameID());
+    GameData game = gameDAO.getGame(result.gameID()); // Use gameDAO for game retrieval
     assertNotNull(game);
     assertEquals(gameName, game.gameName());
     assertNull(game.whiteUsername());

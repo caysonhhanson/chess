@@ -1,22 +1,32 @@
 package server;
 
-import dataaccess.MemoryDataAccess;
+import dataaccess.*;
 import service.UserService;
 import service.GameService;
 import spark.Spark;
 
 public class Server {
+    private final UserService userService;
+    private final GameService gameService;
+
+    public Server() {
+        var userDAO = new MemoryUserDAO();
+        var authDAO = new MemoryAuthDAO();
+        var gameDAO = new MemoryGameDAO();
+
+        userService = new UserService(userDAO, authDAO);
+        gameService = new GameService(userDAO, gameDAO, authDAO);
+    }
+
     public int run(int desiredPort) {
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
 
-        var dataAccess = new MemoryDataAccess();
-        var userService = new UserService(dataAccess);
-        var gameService = new GameService(dataAccess);
+        // Create handlers for user and game services
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
 
-
+        // Set up the API routes
         Spark.delete("/db", gameHandler::handleClear);
         Spark.post("/user", userHandler::handleRegister);
         Spark.post("/session", userHandler::handleLogin);
@@ -25,6 +35,7 @@ public class Server {
         Spark.post("/game", gameHandler::handleCreateGame);
         Spark.put("/game", gameHandler::handleJoinGame);
 
+        // Start the server
         Spark.awaitInitialization();
         return Spark.port();
     }
@@ -33,3 +44,5 @@ public class Server {
         Spark.stop();
     }
 }
+
+

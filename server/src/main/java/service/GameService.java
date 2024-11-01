@@ -6,22 +6,28 @@ import chess.ChessGame;
 import java.util.Collection;
 
 public class GameService {
-  private final DataAccess dataAccess;
+  private final UserDAO userDAO;
+  private final GameDAO gameDAO;
+  private final AuthDAO authDAO;
 
-  public GameService(DataAccess dataAccess) {
-    this.dataAccess = dataAccess;
+  public GameService(UserDAO userDAO, GameDAO gameDAO, AuthDAO authDAO) {
+    this.userDAO = userDAO;
+    this.gameDAO = gameDAO;
+    this.authDAO = authDAO;
   }
 
   public void clear() throws DataAccessException {
-    dataAccess.clear();
+    userDAO.clear();
+    gameDAO.clear();
+    authDAO.clear();
   }
 
   public Collection<GameData> listGames(String authToken) throws DataAccessException, UnauthorizedException {
-    AuthData auth = dataAccess.getAuth(authToken);
+    AuthData auth = authDAO.getAuth(authToken);
     if (auth == null) {
       throw new UnauthorizedException("Error: unauthorized");
     }
-    return dataAccess.listGames();
+    return gameDAO.listGames();
   }
 
   public CreateGameResult createGame(String authToken, String gameName)
@@ -30,15 +36,15 @@ public class GameService {
       throw new BadRequestException("Error: bad request");
     }
 
-    AuthData auth = dataAccess.getAuth(authToken);
+    AuthData auth = authDAO.getAuth(authToken);
     if (auth == null) {
       throw new UnauthorizedException("Error: unauthorized");
     }
 
     GameData newGame = new GameData(0, null, null, gameName, new ChessGame());
-    dataAccess.createGame(newGame);
+    gameDAO.createGame(newGame);
 
-    Collection<GameData> games = dataAccess.listGames();
+    Collection<GameData> games = gameDAO.listGames();
     GameData createdGame = games.stream()
             .filter(g -> g.gameName().equals(gameName))
             .findFirst()
@@ -48,16 +54,16 @@ public class GameService {
   }
 
   public record CreateGameResult(int gameID) {}
+
   public void joinGame(String authToken, String playerColor, int gameID)
           throws DataAccessException, UnauthorizedException, BadRequestException, AlreadyTakenException {
 
-    AuthData auth = dataAccess.getAuth(authToken);
+    AuthData auth = authDAO.getAuth(authToken);
     if (auth == null) {
       throw new UnauthorizedException("Error: unauthorized");
     }
 
-    GameData game = dataAccess.getGame(gameID);
-
+    GameData game = gameDAO.getGame(gameID);
     if (game == null) {
       throw new BadRequestException("Error: bad request");
     }
@@ -84,6 +90,7 @@ public class GameService {
       default -> throw new BadRequestException("Error: bad request");
     }
 
-    dataAccess.updateGame(game);
+    gameDAO.updateGame(game);
   }
 }
+
