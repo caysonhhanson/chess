@@ -16,6 +16,7 @@ public class Server {
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
 
+
         Spark.delete("/db", gameHandler::handleClear);
         Spark.post("/user", userHandler::handleRegister);
         Spark.post("/session", userHandler::handleLogin);
