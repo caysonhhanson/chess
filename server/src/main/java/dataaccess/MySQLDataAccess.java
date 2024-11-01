@@ -234,6 +234,13 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public void deleteAuth(String authToken) throws DataAccessException {
-
+    String sql = "DELETE FROM auth_tokens WHERE authToken = ?";
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, authToken);
+      ps.executeUpdate();
+    } catch (SQLException e) {
+      throw new DataAccessException(e.getMessage());
+    }
   }
 }
