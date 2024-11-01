@@ -159,7 +159,25 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public Collection<GameData> listGames() throws DataAccessException {
-    return null;
+    String sql = "SELECT * FROM games";
+    Collection<GameData> games = new ArrayList<>();
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+      while (rs.next()) {
+        ChessGame game = gson.fromJson(rs.getString("gameState"), ChessGame.class);
+        games.add(new GameData(
+                rs.getInt("gameID"),
+                rs.getString("whiteUsername"),
+                rs.getString("blackUsername"),
+                rs.getString("gameName"),
+                game
+        ));
+      }
+      return games;
+    } catch (SQLException e) {
+      throw new DataAccessException(e.getMessage());
+    }
   }
 
   @Override
