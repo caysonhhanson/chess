@@ -214,7 +214,22 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public AuthData getAuth(String authToken) throws DataAccessException {
-    return null;
+    String sql = "SELECT * FROM auth_tokens WHERE authToken = ?";
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, authToken);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (rs.next()) {
+          return new AuthData(
+                  rs.getString("username"),
+                  rs.getString("authToken")
+          );
+        }
+        return null;
+      }
+    } catch (SQLException e) {
+      throw new DataAccessException(e.getMessage());
+    }
   }
 
   @Override
