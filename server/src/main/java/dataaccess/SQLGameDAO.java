@@ -4,34 +4,29 @@ import chess.ChessGame;
 import com.google.gson.Gson;
 import model.GameData;
 
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 
 public class SQLGameDAO implements GameDAO {
-  private final Gson gson = new Gson();
 
   public SQLGameDAO() {
     try {
-      DatabaseManager.createDatabase(); // Ensure the database is created
+      DatabaseManager.createDatabase();
     } catch (DataAccessException ex) {
       throw new RuntimeException(ex);
     }
-    try (Connection conn = DatabaseManager.getConnection()) {
-      var createTableSQL = """
-                CREATE TABLE IF NOT EXISTS games (
+    try (var conn = DatabaseManager.getConnection()) {
+      var createTestTable = """
+                CREATE TABLE if NOT EXISTS game (
                     gameID INT NOT NULL,
                     whiteUsername VARCHAR(255),
                     blackUsername VARCHAR(255),
                     gameName VARCHAR(255),
-                    gameState TEXT,
+                    chessGame TEXT,
                     PRIMARY KEY (gameID)
-                )
-            """;
-      try (var createTableStatement = conn.prepareStatement(createTableSQL)) {
-        createTableStatement.executeUpdate();
+                )""";
+      try (var preparedStatement = conn.prepareStatement(createTestTable)) {
+        preparedStatement.executeUpdate();
       }
     } catch (SQLException | DataAccessException e) {
       throw new RuntimeException(e);
@@ -39,78 +34,76 @@ public class SQLGameDAO implements GameDAO {
   }
 
   @Override
-  public Collection<GameData> listGames() throws DataAccessException {
-    Collection<GameData> games = new ArrayList<>();
-    try (Connection conn = DatabaseManager.getConnection()) {
-      var sql = "SELECT gameID, whiteUsername, blackUsername, gameName, gameState FROM games";
-      try (var statement = conn.prepareStatement(sql);
-           var results = statement.executeQuery()) {
-        while (results.next()) {
-          int gameID = results.getInt("gameID");
-          String whiteUsername = results.getString("whiteUsername");
-          String blackUsername = results.getString("blackUsername");
-          String gameName = results.getString("gameName");
-          ChessGame chessGame = deserializeGame(results.getString("gameState"));
-          games.add(new GameData(gameID, whiteUsername, blackUsername, gameName, chessGame));
+  public HashSet<GameData> listGames() {
+    HashSet<GameData> games = new HashSet<>(16);
+    try (var conn = DatabaseManager.getConnection()) {
+      try (var preparedStatement = conn.prepareStatement("SELECT gameID, whiteUsername, blackUsername, gameName, chessGame FROM game")) {
+        try (var results = preparedStatement.executeQuery()) {
+          while (results.next()) {
+            var gameID = results.getInt("gameID");
+            var whiteUsername = results.getString("whiteUsername");
+            var blackUsername = results.getString("blackUsername");
+            var gameName = results.getString("gameName");
+            var chessGame = new Gson().fromJson(results.getString("chessGame"), ChessGame.class);
+            games.add(new GameData(gameID, whiteUsername, blackUsername, gameName, chessGame));
+          }
         }
       }
-    } catch (SQLException e) {
-      throw new DataAccessException(e.getMessage());
+    } catch (SQLException | DataAccessException e) {
+      return null;
     }
     return games;
   }
 
   @Override
   public void createGame(GameData game) throws DataAccessException {
-    String sql = "INSERT INTO games (gameID, whiteUsername, blackUsername, gameName, gameState) VALUES (?, ?, ?, ?, ?)";
-    try (Connection conn = DatabaseManager.getConnection();
-         var statement = conn.prepareStatement(sql)) {
-      statement.setInt(1, game.gameID());
-      statement.setString(2, game.whiteUsername());
-      statement.setString(3, game.blackUsername());
-      statement.setString(4, game.gameName());
-      statement.setString(5, serializeGame(game.game()));
-      statement.executeUpdate();
+    try (var conn = DatabaseManager.getConnection()) {
+      try (var preparedStatement = conn.prepareStatement("INSERT INTO game (gameID, whiteUsername, blackUsername, gameName, chessGame) VALUES(?, ?, ?, ?, ?)")) {
+        preparedStatement.setInt(1, game.gameID());
+        preparedStatement.setString(2, game.whiteUsername());
+        preparedStatement.setString(3, game.blackUsername());
+        preparedStatement.setString(4, game.gameName());
+        preparedStatement.setString(5, new Gson().toJson(game.game()));
+        preparedStatement.executeUpdate();
+      }
     } catch (SQLException e) {
       throw new DataAccessException(e.getMessage());
     }
   }
 
   @Override
-  public GameData getGame(int gameID) throws DataAccessException {
-    String sql = "SELECT whiteUsername, blackUsername, gameName, gameState FROM games WHERE gameID=?";
-    try (Connection conn = DatabaseManager.getConnection();
-         var statement = conn.prepareStatement(sql)) {
-      statement.setInt(1, gameID);
-      try (var results = statement.executeQuery()) {
-        if (results.next()) {
-          String whiteUsername = results.getString("whiteUsername");
-          String blackUsername = results.getString("blackUsername");
-          String gameName = results.getString("gameName");
-          ChessGame chessGame = deserializeGame(results.getString("gameState"));
-          return new GameData(gameID, whiteUsername, blackUsername, gameName, chessGame);
-        } else {
-          throw new DataAccessException("Game not found, id: " + gameID);
+  public GameData getGame(int gameID) throws DataAccessException, BadRequestException {
+    try (var conn = DatabaseManager.getConnection()) {
+      try (var preparedStatement = conn.prepareStatement("SELECT whiteUsername, blackUsername, gameName, chessGame FROM game WHERE gameID=?")) {
+        preparedStatement.setInt(1, gameID);
+        try (var results = preparedStatement.executeQuery()) {
+          if (results.next()) {
+            var whiteUsername = results.getString("whiteUsername");
+            var blackUsername = results.getString("blackUsername");
+            var gameName = results.getString("gameName");
+            var chessGame = new Gson().fromJson(results.getString("chessGame"), ChessGame.class);
+            return new GameData(gameID, whiteUsername, blackUsername, gameName, chessGame);
+          } else {
+            throw new BadRequestException("Game not found, id: " + gameID);
+          }
         }
       }
     } catch (SQLException e) {
-      throw new DataAccessException(e.getMessage());
+      throw new BadRequestException("Game not found, id: " + gameID);
     }
   }
 
   @Override
   public void updateGame(GameData game) throws DataAccessException {
-    String sql = "UPDATE games SET whiteUsername=?, blackUsername=?, gameName=?, gameState=? WHERE gameID=?";
-    try (Connection conn = DatabaseManager.getConnection();
-         var statement = conn.prepareStatement(sql)) {
-      statement.setString(1, game.whiteUsername());
-      statement.setString(2, game.blackUsername());
-      statement.setString(3, game.gameName());
-      statement.setString(4, serializeGame(game.game()));
-      statement.setInt(5, game.gameID());
-      int rowsUpdated = statement.executeUpdate();
-      if (rowsUpdated == 0) {
-        throw new DataAccessException("Item requested to be updated not found");
+    try (var conn = DatabaseManager.getConnection()) {
+      try (var preparedStatement = conn.prepareStatement("UPDATE game SET whiteUsername=?, blackUsername=?, gameName=?, chessGame=? WHERE gameID=?")) {
+        preparedStatement.setString(1, game.whiteUsername());
+        preparedStatement.setString(2, game.blackUsername());
+        preparedStatement.setString(3, game.gameName());
+        preparedStatement.setString(4, new Gson().toJson(game.game()));
+        preparedStatement.setInt(5, game.gameID());
+        int rowsUpdated = preparedStatement.executeUpdate();
+        if (rowsUpdated == 0) throw new DataAccessException("Item requested to be updated not found");
       }
     } catch (SQLException e) {
       throw new DataAccessException(e.getMessage());
@@ -118,20 +111,15 @@ public class SQLGameDAO implements GameDAO {
   }
 
   @Override
-  public void clear() throws DataAccessException {
-    try (Connection conn = DatabaseManager.getConnection();
-         var statement = conn.prepareStatement("TRUNCATE games")) {
-      statement.executeUpdate();
-    } catch (SQLException e) {
-      throw new DataAccessException(e.getMessage());
+  public void clear() {
+    try (var conn = DatabaseManager.getConnection()) {
+      try (var preparedStatement = conn.prepareStatement("TRUNCATE game")) {
+        preparedStatement.executeUpdate();
+      } catch (SQLException e) {
+        throw new RuntimeException(e);
+      }
+    } catch (SQLException | DataAccessException e) {
     }
   }
-
-  private String serializeGame(ChessGame game) {
-    return gson.toJson(game);
-  }
-
-  private ChessGame deserializeGame(String serializedGame) {
-    return gson.fromJson(serializedGame, ChessGame.class);
-  }
 }
+
