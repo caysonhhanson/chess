@@ -19,7 +19,7 @@ public class MySQLDataAccessTest {
     dataAccess.clear();
   }
   @Test
-  public void clear_success() throws DataAccessException {
+  public void clearSuccess() throws DataAccessException {
     UserData user = new UserData("testUser", "password123", "test@example.com");
     dataAccess.createUser(user);
     GameData game = new GameData(0, "testUser", null, "Test Game", new ChessGame());
@@ -35,7 +35,7 @@ public class MySQLDataAccessTest {
     assertNull(dataAccess.getAuth("testAuthToken"));
   }
   @Test
-  public void createUser_success() throws DataAccessException {
+  public void createUserSuccess() throws DataAccessException {
     UserData user = new UserData("testUser", "password123", "test@example.com");
     assertDoesNotThrow(() -> dataAccess.createUser(user));
 
@@ -46,11 +46,27 @@ public class MySQLDataAccessTest {
   }
 
   @Test
-  public void createUser_duplicate() throws DataAccessException {
+  public void createUserDuplicate() throws DataAccessException {
     UserData user = new UserData("testUser", "password123", "test@example.com");
     dataAccess.createUser(user);
 
     assertThrows(DataAccessException.class, () -> dataAccess.createUser(user));
+  }
+
+  @Test
+  public void createGameSuccess() throws DataAccessException {
+    // Create a user first due to foreign key constraints
+    UserData user = new UserData("testUser", "password123", "test@example.com");
+    dataAccess.createUser(user);
+
+    GameData game = new GameData(0, "testUser", null, "Test Game", new ChessGame());
+    assertDoesNotThrow(() -> dataAccess.createGame(game));
+
+    Collection<GameData> games = dataAccess.listGames();
+    assertEquals(1, games.size());
+    GameData retrievedGame = games.iterator().next();
+    assertEquals("Test Game", retrievedGame.gameName());
+    assertEquals("testUser", retrievedGame.whiteUsername());
   }
 
 }
