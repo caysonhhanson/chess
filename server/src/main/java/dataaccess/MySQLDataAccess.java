@@ -120,13 +120,14 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public void createGame(GameData game) throws DataAccessException {
-    String sql = "INSERT INTO games (whiteUsername, blackUsername, gameName, gameState) VALUES (?, ?, ?, ?)";
+    String sql = "INSERT INTO games (gameID, whiteUsername, blackUsername, gameName, gameState) VALUES (?, ?, ?, ?, ?)";
     try (Connection conn = DatabaseManager.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-      ps.setString(1, game.whiteUsername());
-      ps.setString(2, game.blackUsername());
-      ps.setString(3, game.gameName());
-      ps.setString(4, gson.toJson(game.game()));
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setInt(1, game.gameID()); // Set the game ID
+      ps.setString(2, game.whiteUsername());
+      ps.setString(3, game.blackUsername());
+      ps.setString(4, game.gameName());
+      ps.setString(5, gson.toJson(game.game())); // Assuming game() returns the game object to be serialized
       ps.executeUpdate();
     } catch (SQLException e) {
       throw new DataAccessException(e.getMessage());
@@ -149,13 +150,15 @@ public class MySQLDataAccess implements DataAccess {
                   rs.getString("gameName"),
                   game
           );
+        } else {
+          throw new BadRequestException("Game with ID " + gameId + " does not exist.");
         }
-        return null;
       }
     } catch (SQLException | DataAccessException e) {
       throw new BadRequestException(e.getMessage());
     }
   }
+
 
   @Override
   public Collection<GameData> listGames() throws DataAccessException {

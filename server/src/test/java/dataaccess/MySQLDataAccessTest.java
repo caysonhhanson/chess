@@ -119,18 +119,12 @@ public class MySQLDataAccessTest {
 
   @Test
   public void updateGame_success() throws DataAccessException, BadRequestException {
-    GameData game = new GameData(0, null, null, TEST_GAME_NAME, new ChessGame());
+    GameData game = new GameData(0, "jack", "tim", TEST_GAME_NAME, new ChessGame());
     dataAccess.createGame(game);
     Collection<GameData> games = dataAccess.listGames();
     GameData createdGame = games.iterator().next();
 
-    GameData updatedGame = new GameData(
-            createdGame.gameID(),
-            TEST_USERNAME,
-            null,
-            TEST_GAME_NAME,
-            createdGame.game()
-    );
+    GameData updatedGame = new GameData(createdGame.gameID(), "wilson", "tim", TEST_GAME_NAME, createdGame.game());
     dataAccess.updateGame(updatedGame);
 
     GameData retrievedGame = dataAccess.getGame(createdGame.gameID());
