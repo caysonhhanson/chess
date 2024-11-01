@@ -201,7 +201,15 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public void createAuth(AuthData auth) throws DataAccessException {
-
+    String sql = "INSERT INTO auth_tokens (authToken, username) VALUES (?, ?)";
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, auth.authToken());
+      ps.setString(2, auth.username());
+      ps.executeUpdate();
+    } catch (SQLException e) {
+      throw new DataAccessException(e.getMessage());
+    }
   }
 
   @Override
