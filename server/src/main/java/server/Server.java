@@ -10,9 +10,9 @@ public class Server {
     private final GameService gameService;
 
     public Server() {
-        var userDAO = new MemoryUserDAO();
-        var authDAO = new MemoryAuthDAO();
-        var gameDAO = new MemoryGameDAO();
+        var userDAO = new SQLUserDAO();
+        var authDAO = new SQLAuthDAO();
+        var gameDAO = new SQLGameDAO();
 
         userService = new UserService(userDAO, authDAO);
         gameService = new GameService(userDAO, gameDAO, authDAO);
