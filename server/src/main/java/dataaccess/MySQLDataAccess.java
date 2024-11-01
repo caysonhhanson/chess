@@ -60,4 +60,69 @@ public class MySQLDataAccess implements DataAccess {
       throw new DataAccessException(e.getMessage());
     }
   }
+
+  @Override
+  public void clear() throws DataAccessException {
+    try (Connection conn = DatabaseManager.getConnection()) {
+      String[] deleteStatements = {
+              "DELETE FROM auth_tokens",
+              "DELETE FROM games",
+              "DELETE FROM users",
+              "ALTER TABLE games AUTO_INCREMENT = 1"
+      };
+
+      for (String statement : deleteStatements) {
+        try (PreparedStatement ps = conn.prepareStatement(statement)) {
+          ps.executeUpdate();
+        }
+      }
+    } catch (SQLException e) {
+      throw new DataAccessException(e.getMessage());
+    }
+  }
+
+  @Override
+  public void createUser(UserData user) throws DataAccessException {
+
+  }
+
+  @Override
+  public UserData getUser(String username) throws DataAccessException {
+    return null;
+  }
+
+  @Override
+  public void createGame(GameData game) throws DataAccessException {
+
+  }
+
+  @Override
+  public GameData getGame(int gameId) throws BadRequestException {
+    return null;
+  }
+
+  @Override
+  public Collection<GameData> listGames() throws DataAccessException {
+    return null;
+  }
+
+  @Override
+  public void updateGame(GameData game) throws DataAccessException {
+
+  }
+
+  @Override
+  public void createAuth(AuthData auth) throws DataAccessException {
+
+  }
+
+  @Override
+  public AuthData getAuth(String authToken) throws DataAccessException {
+    return null;
+  }
+
+  @Override
+  public void deleteAuth(String authToken) throws DataAccessException {
+
+  }
 }
