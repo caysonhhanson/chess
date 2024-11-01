@@ -20,7 +20,6 @@ public class MySQLDataAccessTest {
   }
   @Test
   public void clear_success() throws DataAccessException {
-    // Create test data
     UserData user = new UserData("testUser", "password123", "test@example.com");
     dataAccess.createUser(user);
     GameData game = new GameData(0, "testUser", null, "Test Game", new ChessGame());
@@ -28,12 +27,30 @@ public class MySQLDataAccessTest {
     AuthData auth = new AuthData("testUser", "testAuthToken");
     dataAccess.createAuth(auth);
 
-    // Clear all data
     assertDoesNotThrow(() -> dataAccess.clear());
 
-    // Verify everything is cleared
+
     assertNull(dataAccess.getUser("testUser"));
     assertTrue(dataAccess.listGames().isEmpty());
     assertNull(dataAccess.getAuth("testAuthToken"));
   }
+  @Test
+  public void createUser_success() throws DataAccessException {
+    UserData user = new UserData("testUser", "password123", "test@example.com");
+    assertDoesNotThrow(() -> dataAccess.createUser(user));
+
+    UserData retrievedUser = dataAccess.getUser("testUser");
+    assertNotNull(retrievedUser);
+    assertEquals("testUser", retrievedUser.username());
+    assertEquals("test@example.com", retrievedUser.email());
+  }
+
+  @Test
+  public void createUser_duplicate() throws DataAccessException {
+    UserData user = new UserData("testUser", "password123", "test@example.com");
+    dataAccess.createUser(user);
+
+    assertThrows(DataAccessException.class, () -> dataAccess.createUser(user));
+  }
+
 }

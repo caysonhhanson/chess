@@ -3,7 +3,7 @@ package dataaccess;
 import chess.ChessGame;
 import com.google.gson.Gson;
 import model.*;
-import org.mindrot.jbcrypt.BCrypt; // Use jBCrypt instead of Spring's BCrypt
+import org.mindrot.jbcrypt.BCrypt;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,7 +22,6 @@ public class MySQLDataAccess implements DataAccess {
   private void configureDatabase() throws DataAccessException {
     DatabaseManager.createDatabase();
     try (Connection conn=DatabaseManager.getConnection()) {
-      // Create tables in correct order for foreign key constraints
       String[] createStatements={
               """
                 CREATE TABLE IF NOT EXISTS users (
@@ -83,7 +82,19 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public void createUser(UserData user) throws DataAccessException {
-
+    String sql = "INSERT INTO users (username, password, email) VALUES (?, ?, ?)";
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, user.username());
+      ps.setString(2, BCrypt.hashpw(user.password(), BCrypt.gensalt())); // Use jBCrypt for hashing
+      ps.setString(3, user.email());
+      ps.executeUpdate();
+    } catch (SQLException e) {
+      if (e.getMessage().contains("Duplicate entry")) {
+        throw new DataAccessException("Error: already taken");
+      }
+      throw new DataAccessException(e.getMessage());
+    }
   }
 
   @Override
