@@ -135,7 +135,26 @@ public class MySQLDataAccess implements DataAccess {
 
   @Override
   public GameData getGame(int gameId) throws BadRequestException {
-    return null;
+    String sql = "SELECT * FROM games WHERE gameID = ?";
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setInt(1, gameId);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (rs.next()) {
+          ChessGame game = gson.fromJson(rs.getString("gameState"), ChessGame.class);
+          return new GameData(
+                  rs.getInt("gameID"),
+                  rs.getString("whiteUsername"),
+                  rs.getString("blackUsername"),
+                  rs.getString("gameName"),
+                  game
+          );
+        }
+        return null;
+      }
+    } catch (SQLException | DataAccessException e) {
+      throw new BadRequestException(e.getMessage());
+    }
   }
 
   @Override
