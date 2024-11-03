@@ -1,5 +1,4 @@
 package server;
-
 import dataaccess.*;
 import service.UserService;
 import service.GameService;
@@ -8,15 +7,12 @@ import spark.Spark;
 public class Server {
     private final UserService userService;
     private final GameService gameService;
-
     public Server() {
         try {
             DatabaseInitializer.initialize();
-
             var userDAO = new SQLUserDAO();
             var authDAO = new SQLAuthDAO();
             var gameDAO = new SQLGameDAO();
-
             userService = new UserService(userDAO, authDAO);
             gameService = new GameService(userDAO, gameDAO, authDAO);
         } catch (DataAccessException e) {
@@ -24,11 +20,9 @@ public class Server {
             throw new RuntimeException(e);
         }
     }
-
     public int run(int desiredPort) {
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
-
         Spark.options("/*", (request, response) -> {
             String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
             if (accessControlRequestHeaders != null) {
@@ -40,10 +34,8 @@ public class Server {
             }
             return "OK";
         });
-
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
-
         Spark.delete("/db", gameHandler::handleClear);
         Spark.post("/user", userHandler::handleRegister);
         Spark.post("/session", userHandler::handleLogin);
@@ -51,15 +43,12 @@ public class Server {
         Spark.get("/game", gameHandler::handleListGames);
         Spark.post("/game", gameHandler::handleCreateGame);
         Spark.put("/game", gameHandler::handleJoinGame);
-
         Spark.awaitInitialization();
         return Spark.port();
     }
-
     public void stop() {
         Spark.stop();
         Spark.awaitStop();
     }
 }
-
 
