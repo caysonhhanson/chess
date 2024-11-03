@@ -208,4 +208,47 @@ public class MySQLDataAccessTest {
     gameDAO.clear();
     assertTrue(gameDAO.listGames().isEmpty());
   }
+
+  @Test
+  void clearUserNegative() throws DataAccessException {
+    userDAO.clear();
+
+    UserData retrievedUser = userDAO.getUser("nonexistent");
+    assertNull(retrievedUser);
+  }
+
+  @Test
+  void createAuthNegative() throws DataAccessException {
+    AuthData invalidAuth = new AuthData("nonexistentUser", "token123");
+    assertThrows(DataAccessException.class, () -> {
+      authDAO.createAuth(invalidAuth);
+    });
+  }
+
+  @Test
+  void clearAuthNegative() throws DataAccessException {
+    authDAO.clear();
+
+    AuthData retrievedAuth = authDAO.getAuth("nonexistent");
+    assertNull(retrievedAuth);
+  }
+  @Test
+  void createGameNegative() throws DataAccessException {
+    GameData invalidGame = new GameData(0, "nonexistentUser", null, "testGame", new ChessGame());
+    assertThrows(DataAccessException.class, () -> {
+      gameDAO.createGame(invalidGame);
+    });
+  }
+  @Test
+  void getGameNegative() throws DataAccessException {
+    GameData retrievedGame = gameDAO.getGame(-1);
+    assertNull(retrievedGame);
+  }
+  @Test
+  void clearGameNegative() throws DataAccessException {
+    gameDAO.clear();
+
+    Collection<GameData> games = gameDAO.listGames();
+    assertTrue(games.isEmpty());
+  }
 }
