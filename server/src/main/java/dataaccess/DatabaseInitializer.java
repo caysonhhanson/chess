@@ -4,7 +4,6 @@ import java.sql.SQLException;
 
 public class DatabaseInitializer {
   private static final String[] createStatements = {
-          // Note: Column names match exactly with your DAO implementations
           """
         CREATE TABLE IF NOT EXISTS users (
             username VARCHAR(255) PRIMARY KEY,

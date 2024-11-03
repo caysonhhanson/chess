@@ -11,7 +11,6 @@ public class Server {
 
     public Server() {
         try {
-            // Initialize the database before creating DAOs
             DatabaseInitializer.initialize();
 
             var userDAO = new SQLUserDAO();
@@ -30,7 +29,6 @@ public class Server {
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
 
-        // CORS headers for development
         Spark.options("/*", (request, response) -> {
             String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
             if (accessControlRequestHeaders != null) {
@@ -43,7 +41,6 @@ public class Server {
             return "OK";
         });
 
-        // Register your endpoints
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
 

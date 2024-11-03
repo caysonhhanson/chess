@@ -3,6 +3,7 @@ package dataaccess;
 import chess.ChessGame;
 import model.*;
 import org.junit.jupiter.api.*;
+import org.mindrot.jbcrypt.BCrypt;
 
 import java.util.Collection;
 
@@ -12,201 +13,199 @@ public class MySQLDataAccessTest {
   private SQLUserDAO userDAO;
   private SQLGameDAO gameDAO;
   private SQLAuthDAO authDAO;
-  private static final String TEST_USERNAME = "testUser";
-  private static final String TEST_PASSWORD = "testPass";
-  private static final String TEST_EMAIL = "test@example.com";
-  private static final String TEST_AUTH_TOKEN = "testAuthToken";
-  private static final String TEST_GAME_NAME = "testGame";
+
+  private final UserData defaultUser = new UserData("username", "password", "email");
+  private final AuthData defaultAuth = new AuthData("username", "token");
+  private GameData defaultGameData;
 
   @BeforeEach
-  public void setUp() throws DataAccessException {
+  void setUp() throws DataAccessException {
     DatabaseInitializer.initialize();
 
     userDAO = new SQLUserDAO();
     gameDAO = new SQLGameDAO();
     authDAO = new SQLAuthDAO();
 
-    userDAO.clear();
-    gameDAO.clear();
     authDAO.clear();
+    gameDAO.clear();
+    userDAO.clear();
+
+
+    ChessGame defaultChessGame = new ChessGame();
+    defaultGameData = new GameData(1234, "white", "black", "gamename", defaultChessGame);
   }
 
-  // User Tests
   @Test
-  public void createUser_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
+  void createUserPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
 
-    UserData retrievedUser = userDAO.getUser(TEST_USERNAME);
+    UserData retrievedUser = userDAO.getUser(defaultUser.username());
     assertNotNull(retrievedUser);
-    assertEquals(TEST_USERNAME, retrievedUser.username());
-    assertEquals(TEST_EMAIL, retrievedUser.email());
-    assertTrue(retrievedUser.password().startsWith("$2a"));
+    assertEquals(defaultUser.username(), retrievedUser.username());
+    assertEquals(defaultUser.email(), retrievedUser.email());
+    assertTrue(BCrypt.checkpw(defaultUser.password(), retrievedUser.password()));
   }
 
   @Test
-  public void createUser_duplicate_fails() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-
-    DataAccessException exception = assertThrows(DataAccessException.class, () -> {
-      userDAO.createUser(user);
-    });
+  void createUserDuplicateFails() throws DataAccessException {
+    userDAO.createUser(defaultUser);
+    DataAccessException exception = assertThrows(DataAccessException.class,
+            () -> userDAO.createUser(defaultUser)
+    );
     assertEquals("Error: already taken", exception.getMessage());
   }
 
   @Test
-  public void getUser_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-
-    UserData retrievedUser = userDAO.getUser(TEST_USERNAME);
+  void getUserPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
+    UserData retrievedUser = userDAO.getUser(defaultUser.username());
     assertNotNull(retrievedUser);
-    assertEquals(TEST_USERNAME, retrievedUser.username());
+    assertEquals(defaultUser.username(), retrievedUser.username());
+    assertEquals(defaultUser.email(), retrievedUser.email());
+    assertTrue(BCrypt.checkpw(defaultUser.password(), retrievedUser.password()));
   }
 
   @Test
-  public void getUser_nonexistent() throws DataAccessException {
-    UserData retrievedUser = userDAO.getUser("nonexistentUser");
-    assertNull(retrievedUser);
+  void getUserNonexistent() throws DataAccessException {
+    assertNull(userDAO.getUser(defaultUser.username()));
   }
 
-  // Game Tests
   @Test
-  public void createGame_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
+  void createAuthPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
 
-    GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
-    gameDAO.createGame(game);
+    authDAO.createAuth(defaultAuth);
+    AuthData retrieved = authDAO.getAuth(defaultAuth.authToken());
+    assertNotNull(retrieved);
+    assertEquals(defaultAuth.username(), retrieved.username());
+    assertEquals(defaultAuth.authToken(), retrieved.authToken());
+  }
+
+  @Test
+  void getAuthPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
+
+    authDAO.createAuth(defaultAuth);
+    AuthData retrieved = authDAO.getAuth(defaultAuth.authToken());
+    assertNotNull(retrieved);
+    assertEquals(defaultAuth.username(), retrieved.username());
+    assertEquals(defaultAuth.authToken(), retrieved.authToken());
+  }
+
+  @Test
+  void getAuthNonexistent() throws DataAccessException {
+    assertNull(authDAO.getAuth("nonexistentToken"));
+  }
+
+  @Test
+  void deleteAuthPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
+
+    authDAO.createAuth(defaultAuth);
+    authDAO.deleteAuth(defaultAuth.authToken());
+    assertNull(authDAO.getAuth(defaultAuth.authToken()));
+  }
+
+  @Test
+  void deleteAuthNonexistent() throws DataAccessException {
+    assertDoesNotThrow(() -> authDAO.deleteAuth("nonexistentToken"));
+  }
+
+  @Test
+  void createGamePositive() throws DataAccessException {
+    // First create users for white and black players
+    userDAO.createUser(new UserData("white", "pass", "white@email.com"));
+    userDAO.createUser(new UserData("black", "pass", "black@email.com"));
+
+    gameDAO.createGame(defaultGameData);
 
     Collection<GameData> games = gameDAO.listGames();
-    assertFalse(games.isEmpty());
     assertEquals(1, games.size());
-    GameData retrievedGame = games.iterator().next();
-    assertEquals(TEST_GAME_NAME, retrievedGame.gameName());
-    assertEquals(TEST_USERNAME, retrievedGame.whiteUsername());
+    GameData retrieved = games.iterator().next();
+    assertEquals(defaultGameData.whiteUsername(), retrieved.whiteUsername());
+    assertEquals(defaultGameData.blackUsername(), retrieved.blackUsername());
+    assertEquals(defaultGameData.gameName(), retrieved.gameName());
   }
 
   @Test
-  public void getGame_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
+  void listGamesPositive() throws DataAccessException {
+    userDAO.createUser(new UserData("white", "pass", "white@email.com"));
+    userDAO.createUser(new UserData("black", "pass", "black@email.com"));
 
-    GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
-    gameDAO.createGame(game);
+    gameDAO.createGame(defaultGameData);
+    GameData secondGame = new GameData(2345, "white", "black", "game2", new ChessGame());
+    gameDAO.createGame(secondGame);
 
     Collection<GameData> games = gameDAO.listGames();
-    int gameId = games.iterator().next().gameID();
-
-    GameData retrievedGame = gameDAO.getGame(gameId);
-    assertNotNull(retrievedGame);
-    assertEquals(TEST_GAME_NAME, retrievedGame.gameName());
-    assertEquals(TEST_USERNAME, retrievedGame.whiteUsername());
+    assertEquals(2, games.size());
   }
 
   @Test
-  public void updateGame_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-    UserData user2 = new UserData("player2", TEST_PASSWORD, "p2@example.com");
-    userDAO.createUser(user2);
+  void listGamesEmpty() throws DataAccessException {
+    Collection<GameData> games = gameDAO.listGames();
+    assertTrue(games.isEmpty());
+  }
 
-    GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
-    gameDAO.createGame(game);
+  @Test
+  void updateGamePositive() throws DataAccessException {
+    userDAO.createUser(new UserData("white", "pass", "white@email.com"));
+    userDAO.createUser(new UserData("black", "pass", "black@email.com"));
+    userDAO.createUser(new UserData("newWhite", "pass", "new@email.com"));
+
+    GameData initialGame = new GameData(0, "white", "black", "testGame", new ChessGame());
+    gameDAO.createGame(initialGame);
 
     Collection<GameData> games = gameDAO.listGames();
     GameData createdGame = games.iterator().next();
+    int actualGameId = createdGame.gameID();
 
     GameData updatedGame = new GameData(
-            createdGame.gameID(),
-            createdGame.whiteUsername(),
-            "player2",  // Add black player
+            actualGameId,
+            "newWhite",
+            createdGame.blackUsername(),
             createdGame.gameName(),
             createdGame.game()
     );
+
     gameDAO.updateGame(updatedGame);
 
-    GameData retrievedGame = gameDAO.getGame(createdGame.gameID());
-    assertEquals("player2", retrievedGame.blackUsername());
+    GameData retrievedGame = gameDAO.getGame(actualGameId);
+    assertNotNull(retrievedGame);
+    assertEquals("newWhite", retrievedGame.whiteUsername());
+    assertEquals("black", retrievedGame.blackUsername());
+    assertEquals("testGame", retrievedGame.gameName());
   }
 
   @Test
-  public void updateGame_nonexistent() throws DataAccessException {
-    GameData nonexistentGame = new GameData(999, null, null, TEST_GAME_NAME, new ChessGame());
-    DataAccessException exception = assertThrows(DataAccessException.class, () -> {
-      gameDAO.updateGame(nonexistentGame);
-    });
+  void updateGameNonexistent() {
+    GameData nonexistentGame = new GameData(999, null, null, "gameName", new ChessGame());
+    DataAccessException exception = assertThrows(DataAccessException.class,
+            () -> gameDAO.updateGame(nonexistentGame)
+    );
     assertEquals("Error: game not found", exception.getMessage());
   }
 
-  // Auth Tests
   @Test
-  public void createAuth_success() throws DataAccessException {
-    // First create a user
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-
-    AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
-    authDAO.createAuth(auth);
-
-    AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
-    assertNotNull(retrievedAuth);
-    assertEquals(TEST_USERNAME, retrievedAuth.username());
-    assertEquals(TEST_AUTH_TOKEN, retrievedAuth.authToken());
-  }
-
-  @Test
-  public void getAuth_success() throws DataAccessException {
-    // First create a user
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-
-    AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
-    authDAO.createAuth(auth);
-
-    AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
-    assertNotNull(retrievedAuth);
-    assertEquals(TEST_USERNAME, retrievedAuth.username());
-    assertEquals(TEST_AUTH_TOKEN, retrievedAuth.authToken());
-  }
-
-  @Test
-  public void getAuth_nonexistent() throws DataAccessException {
-    AuthData retrievedAuth = authDAO.getAuth("nonexistentToken");
-    assertNull(retrievedAuth);
-  }
-
-  @Test
-  public void deleteAuth_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-
-    AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
-    authDAO.createAuth(auth);
-
-    authDAO.deleteAuth(TEST_AUTH_TOKEN);
-    AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
-    assertNull(retrievedAuth);
-  }
-
-  @Test
-  public void clear_success() throws DataAccessException {
-    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    userDAO.createUser(user);
-
-    GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
-    gameDAO.createGame(game);
-
-    AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
-    authDAO.createAuth(auth);
-
+  void clearUserPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
     userDAO.clear();
-    gameDAO.clear();
-    authDAO.clear();
+    assertNull(userDAO.getUser(defaultUser.username()));
+  }
 
-    assertNull(userDAO.getUser(TEST_USERNAME));
+  @Test
+  void clearAuthPositive() throws DataAccessException {
+    userDAO.createUser(defaultUser);
+    authDAO.createAuth(defaultAuth);
+    authDAO.clear();
+    assertNull(authDAO.getAuth(defaultAuth.authToken()));
+  }
+
+  @Test
+  void clearGamePositive() throws DataAccessException {
+    userDAO.createUser(new UserData("white", "pass", "white@email.com"));
+    userDAO.createUser(new UserData("black", "pass", "black@email.com"));
+    gameDAO.createGame(defaultGameData);
+    gameDAO.clear();
     assertTrue(gameDAO.listGames().isEmpty());
-    assertNull(authDAO.getAuth(TEST_AUTH_TOKEN));
   }
 }
