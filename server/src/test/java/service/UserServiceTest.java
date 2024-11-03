@@ -3,6 +3,9 @@ package service;
 import dataaccess.*;
 import model.*;
 import org.junit.jupiter.api.*;
+
+import java.util.Collection;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class UserServiceTest {
@@ -11,63 +14,15 @@ public class UserServiceTest {
   private AuthDAO authDAO;
 
   @BeforeEach
-  public void setUp() {
-    userDAO = new MemoryUserDAO();
-    authDAO = new MemoryAuthDAO();
+  public void setUp() throws DataAccessException {
+    DatabaseInitializer.initialize();
+
+    userDAO = new SQLUserDAO();
+    authDAO = new SQLAuthDAO();
     userService = new UserService(userDAO, authDAO);
-  }
 
-  @Test
-  public void registerSuccess() throws DataAccessException {
-    String username = "testUser";
-    String password = "password";
-    String email = "email@test.com";
-
-    AuthData result = userService.register(username, password, email);
-
-    assertNotNull(result);
-    assertNotNull(result.authToken());
-    assertEquals(username, result.username());
-
-    UserData savedUser = userDAO.getUser(username);
-    assertNotNull(savedUser);
-    assertEquals(username, savedUser.username());
-    assertEquals(password, savedUser.password());
-    assertEquals(email, savedUser.email());
-
-    AuthData savedAuth = authDAO.getAuth(result.authToken());
-    assertNotNull(savedAuth);
-    assertEquals(result.authToken(), savedAuth.authToken());
-    assertEquals(username, savedAuth.username());
-  }
-
-  @Test
-  public void registerFailDuplicate() throws DataAccessException {
-    userService.register("testUser", "password", "email@test.com");
-
-    assertThrows(DataAccessException.class, () ->
-            userService.register("testUser", "differentPassword", "different@test.com"));
-  }
-
-  @Test
-  public void registerFailBadRequest() {
-    assertThrows(DataAccessException.class, () ->
-            userService.register(null, "password", "email@test.com"));
-
-    assertThrows(DataAccessException.class, () ->
-            userService.register("", "password", "email@test.com"));
-
-    assertThrows(DataAccessException.class, () ->
-            userService.register("testUser", null, "email@test.com"));
-
-    assertThrows(DataAccessException.class, () ->
-            userService.register("testUser", "", "email@test.com"));
-
-    assertThrows(DataAccessException.class, () ->
-            userService.register("testUser", "password", null));
-
-    assertThrows(DataAccessException.class, () ->
-            userService.register("testUser", "password", ""));
+    userDAO.clear();
+    authDAO.clear();
   }
 
   @Test
@@ -88,53 +43,110 @@ public class UserServiceTest {
     assertEquals(username, savedAuth.username());
   }
 
+
   @Test
-  public void loginFailWrongPassword() throws DataAccessException {
+  public void registerSuccess() throws DataAccessException {
     String username = "testUser";
-    userService.register(username, "correctPassword", "email@test.com");
+    String password = "password";
+    String email = "email@test.com";
+
+    AuthData result = userService.register(username, password, email);
+
+    assertNotNull(result);
+    assertNotNull(result.authToken());
+    assertEquals(username, result.username());
+
+    UserData savedUser = userDAO.getUser(username);
+    assertNotNull(savedUser);
+    assertEquals(username, savedUser.username());
+    assertTrue(savedUser.password().startsWith("$2a"));
+    assertNotEquals(password, savedUser.password());
+    assertEquals(email, savedUser.email());
+
+    AuthData savedAuth = authDAO.getAuth(result.authToken());
+    assertNotNull(savedAuth);
+    assertEquals(result.authToken(), savedAuth.authToken());
+    assertEquals(username, savedAuth.username());
+  }
+
+  @Test
+  public void registerFailDuplicate() throws DataAccessException {
+    userService.register("testUser", "password", "email@test.com");
 
     DataAccessException exception = assertThrows(DataAccessException.class, () ->
-            userService.login(username, "wrongPassword"));
+            userService.register("testUser", "differentPassword", "different@test.com")
+    );
+    assertEquals("Error: already taken", exception.getMessage());
+  }
+
+  @Test
+  public void registerFailBadRequest() throws DataAccessException {
+    assertThrows(DataAccessException.class, () ->
+            userService.register(null, "password", "email@test.com")
+    );
+    assertThrows(DataAccessException.class, () ->
+            userService.register("", "password", "email@test.com")
+    );
+
+    assertThrows(DataAccessException.class, () ->
+            userService.register("testUser", null, "email@test.com")
+    );
+    assertThrows(DataAccessException.class, () ->
+            userService.register("testUser", "", "email@test.com")
+    );
+
+    assertThrows(DataAccessException.class, () ->
+            userService.register("testUser", "password", null)
+    );
+    assertThrows(DataAccessException.class, () ->
+            userService.register("testUser", "password", "")
+    );
+
+    Collection<UserData> users = userDAO.listUsers();
+    assertTrue(users.isEmpty());
+  }
+
+  @Test
+  void loginFailUserDoesNotExist() {
+    DataAccessException exception = assertThrows(DataAccessException.class, () ->
+            userService.login("nonexistentUser", "password")
+    );
     assertEquals("Error: unauthorized", exception.getMessage());
   }
 
   @Test
-  public void loginFailUserDoesNotExist() {
-    DataAccessException exception = assertThrows(DataAccessException.class, () ->
-            userService.login("nonexistentUser", "password"));
-    assertEquals("Error: unauthorized", exception.getMessage());
-  }
-
-  @Test
-  public void loginFailBadRequest() {
+  void loginFailBadRequest() {
     assertThrows(DataAccessException.class, () ->
-            userService.login(null, "password"));
+            userService.login(null, "password")
+    );
+    assertThrows(DataAccessException.class, () ->
+            userService.login("", "password")
+    );
 
     assertThrows(DataAccessException.class, () ->
-            userService.login("", "password"));
-
+            userService.login("testUser", null)
+    );
     assertThrows(DataAccessException.class, () ->
-            userService.login("testUser", null));
-
-    assertThrows(DataAccessException.class, () ->
-            userService.login("testUser", ""));
+            userService.login("testUser", "")
+    );
   }
 
   @Test
   void logoutSuccess() throws DataAccessException {
-    String username = "testUser";
-    String password = "password";
-    AuthData regResult = userService.register(username, password, "test@example.com");
-
+    AuthData regResult = userService.register("testUser", "password", "test@example.com");
     assertDoesNotThrow(() -> userService.logout(regResult));
+
+    assertNull(authDAO.getAuth(regResult.authToken()));
 
     assertThrows(DataAccessException.class, () -> userService.logout(regResult));
   }
 
   @Test
   void logoutFailInvalidAuth() {
-    // Test with invalid auth token
-    AuthData invalidAuth = new AuthData("invalidToken", "testUser");
-    assertThrows(DataAccessException.class, () -> userService.logout(invalidAuth));
+    AuthData invalidAuth = new AuthData("testUser", "invalidToken");
+    DataAccessException exception = assertThrows(DataAccessException.class,
+            () -> userService.logout(invalidAuth)
+    );
+    assertEquals("Error: unauthorized", exception.getMessage());
   }
 }

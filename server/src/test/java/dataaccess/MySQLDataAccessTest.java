@@ -20,14 +20,12 @@ public class MySQLDataAccessTest {
 
   @BeforeEach
   public void setUp() throws DataAccessException {
-    // Initialize the database tables before each test
     DatabaseInitializer.initialize();
 
     userDAO = new SQLUserDAO();
     gameDAO = new SQLGameDAO();
     authDAO = new SQLAuthDAO();
 
-    // Clear all data before each test
     userDAO.clear();
     gameDAO.clear();
     authDAO.clear();
@@ -43,8 +41,7 @@ public class MySQLDataAccessTest {
     assertNotNull(retrievedUser);
     assertEquals(TEST_USERNAME, retrievedUser.username());
     assertEquals(TEST_EMAIL, retrievedUser.email());
-    // Don't check the password directly since it's hashed
-    assertTrue(retrievedUser.password().startsWith("$2a")); // BCrypt hash prefix
+    assertTrue(retrievedUser.password().startsWith("$2a"));
   }
 
   @Test
@@ -77,7 +74,6 @@ public class MySQLDataAccessTest {
   // Game Tests
   @Test
   public void createGame_success() throws DataAccessException {
-    // First create a user since we have foreign key constraints
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
@@ -94,19 +90,15 @@ public class MySQLDataAccessTest {
 
   @Test
   public void getGame_success() throws DataAccessException {
-    // First create a user
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
-    // Create a game
     GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
     gameDAO.createGame(game);
 
-    // Get the game ID from the list
     Collection<GameData> games = gameDAO.listGames();
     int gameId = games.iterator().next().gameID();
 
-    // Test getting the specific game
     GameData retrievedGame = gameDAO.getGame(gameId);
     assertNotNull(retrievedGame);
     assertEquals(TEST_GAME_NAME, retrievedGame.gameName());
@@ -115,21 +107,17 @@ public class MySQLDataAccessTest {
 
   @Test
   public void updateGame_success() throws DataAccessException {
-    // First create a user
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
     UserData user2 = new UserData("player2", TEST_PASSWORD, "p2@example.com");
     userDAO.createUser(user2);
 
-    // Create initial game
     GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
     gameDAO.createGame(game);
 
-    // Get the created game's ID
     Collection<GameData> games = gameDAO.listGames();
     GameData createdGame = games.iterator().next();
 
-    // Update the game
     GameData updatedGame = new GameData(
             createdGame.gameID(),
             createdGame.whiteUsername(),
@@ -139,7 +127,6 @@ public class MySQLDataAccessTest {
     );
     gameDAO.updateGame(updatedGame);
 
-    // Verify update
     GameData retrievedGame = gameDAO.getGame(createdGame.gameID());
     assertEquals("player2", retrievedGame.blackUsername());
   }
@@ -192,15 +179,12 @@ public class MySQLDataAccessTest {
 
   @Test
   public void deleteAuth_success() throws DataAccessException {
-    // First create a user
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
-    // Create auth token
     AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
     authDAO.createAuth(auth);
 
-    // Delete and verify
     authDAO.deleteAuth(TEST_AUTH_TOKEN);
     AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
     assertNull(retrievedAuth);
@@ -208,7 +192,6 @@ public class MySQLDataAccessTest {
 
   @Test
   public void clear_success() throws DataAccessException {
-    // Create test data
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
@@ -218,12 +201,10 @@ public class MySQLDataAccessTest {
     AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
     authDAO.createAuth(auth);
 
-    // Clear all data
     userDAO.clear();
     gameDAO.clear();
     authDAO.clear();
 
-    // Verify everything is cleared
     assertNull(userDAO.getUser(TEST_USERNAME));
     assertTrue(gameDAO.listGames().isEmpty());
     assertNull(authDAO.getAuth(TEST_AUTH_TOKEN));
