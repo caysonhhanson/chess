@@ -2,6 +2,8 @@ package service;
 
 import dataaccess.*;
 import model.*;
+import org.mindrot.jbcrypt.BCrypt;
+
 import java.util.UUID;
 
 public class UserService {
@@ -24,6 +26,7 @@ public class UserService {
       throw new DataAccessException("Error: already taken");
     }
 
+    // Let the DAO handle password hashing
     UserData newUser = new UserData(username, password, email);
     userDAO.createUser(newUser);
 
@@ -41,7 +44,13 @@ public class UserService {
     }
 
     UserData user = userDAO.getUser(username);
-    if (user == null || !user.password().equals(password)) {
+    if (user == null) {
+      throw new DataAccessException("Error: unauthorized");
+    }
+
+    // Get stored user and compare passwords, let DAO handle BCrypt verification
+    UserData storedUser = userDAO.getUser(username);
+    if (storedUser == null || !BCrypt.checkpw(password, storedUser.password())) {
       throw new DataAccessException("Error: unauthorized");
     }
 

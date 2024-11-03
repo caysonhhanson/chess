@@ -19,14 +19,16 @@ public class Server {
     }
 
     public int run(int desiredPort) {
+        Spark.stop();
+        Spark.awaitStop();
+
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
 
-        // Create handlers for user and game services
+
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
 
-        // Set up the API routes
         Spark.delete("/db", gameHandler::handleClear);
         Spark.post("/user", userHandler::handleRegister);
         Spark.post("/session", userHandler::handleLogin);
@@ -35,13 +37,13 @@ public class Server {
         Spark.post("/game", gameHandler::handleCreateGame);
         Spark.put("/game", gameHandler::handleJoinGame);
 
-        // Start the server
         Spark.awaitInitialization();
         return Spark.port();
     }
 
     public void stop() {
         Spark.stop();
+        Spark.awaitStop();
     }
 }
 
