@@ -10,22 +10,40 @@ public class Server {
     private final GameService gameService;
 
     public Server() {
-        var userDAO = new SQLUserDAO();
-        var authDAO = new SQLAuthDAO();
-        var gameDAO = new SQLGameDAO();
+        try {
+            // Initialize the database before creating DAOs
+            DatabaseInitializer.initialize();
 
-        userService = new UserService(userDAO, authDAO);
-        gameService = new GameService(userDAO, gameDAO, authDAO);
+            var userDAO = new SQLUserDAO();
+            var authDAO = new SQLAuthDAO();
+            var gameDAO = new SQLGameDAO();
+
+            userService = new UserService(userDAO, authDAO);
+            gameService = new GameService(userDAO, gameDAO, authDAO);
+        } catch (DataAccessException e) {
+            System.err.println("Failed to initialize server: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 
     public int run(int desiredPort) {
-        Spark.stop();
-        Spark.awaitStop();
-
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
 
+        // CORS headers for development
+        Spark.options("/*", (request, response) -> {
+            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+            }
+            String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
+            if (accessControlRequestMethod != null) {
+                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+            }
+            return "OK";
+        });
 
+        // Register your endpoints
         var userHandler = new UserHandler(userService);
         var gameHandler = new GameHandler(gameService);
 

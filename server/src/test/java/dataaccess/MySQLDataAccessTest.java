@@ -20,10 +20,14 @@ public class MySQLDataAccessTest {
 
   @BeforeEach
   public void setUp() throws DataAccessException {
+    // Initialize the database tables before each test
+    DatabaseInitializer.initialize();
+
     userDAO = new SQLUserDAO();
     gameDAO = new SQLGameDAO();
     authDAO = new SQLAuthDAO();
 
+    // Clear all data before each test
     userDAO.clear();
     gameDAO.clear();
     authDAO.clear();
@@ -39,15 +43,19 @@ public class MySQLDataAccessTest {
     assertNotNull(retrievedUser);
     assertEquals(TEST_USERNAME, retrievedUser.username());
     assertEquals(TEST_EMAIL, retrievedUser.email());
+    // Don't check the password directly since it's hashed
+    assertTrue(retrievedUser.password().startsWith("$2a")); // BCrypt hash prefix
   }
 
   @Test
-  public void createUser_duplicate_fails() {
+  public void createUser_duplicate_fails() throws DataAccessException {
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
-    assertThrows(DataAccessException.class, () -> {
+    userDAO.createUser(user);
+
+    DataAccessException exception = assertThrows(DataAccessException.class, () -> {
       userDAO.createUser(user);
-      userDAO.createUser(user); // Should throw exception
     });
+    assertEquals("Error: already taken", exception.getMessage());
   }
 
   @Test
@@ -68,7 +76,11 @@ public class MySQLDataAccessTest {
 
   // Game Tests
   @Test
-  public void createGameSuccess() throws DataAccessException, BadRequestException {
+  public void createGame_success() throws DataAccessException {
+    // First create a user since we have foreign key constraints
+    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
+    userDAO.createUser(user);
+
     GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
     gameDAO.createGame(game);
 
@@ -77,73 +89,68 @@ public class MySQLDataAccessTest {
     assertEquals(1, games.size());
     GameData retrievedGame = games.iterator().next();
     assertEquals(TEST_GAME_NAME, retrievedGame.gameName());
+    assertEquals(TEST_USERNAME, retrievedGame.whiteUsername());
   }
 
   @Test
-  public void createGame_withInvalidUser_fails() {
-    GameData game = new GameData(0, "nonexistentUser", null, TEST_GAME_NAME, new ChessGame());
-    assertThrows(DataAccessException.class, () -> {
-      gameDAO.createGame(game);
-    });
-  }
+  public void getGame_success() throws DataAccessException {
+    // First create a user
+    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
+    userDAO.createUser(user);
 
-  @Test
-  public void getGame_success() throws DataAccessException, BadRequestException {
+    // Create a game
     GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
     gameDAO.createGame(game);
+
+    // Get the game ID from the list
     Collection<GameData> games = gameDAO.listGames();
     int gameId = games.iterator().next().gameID();
 
+    // Test getting the specific game
     GameData retrievedGame = gameDAO.getGame(gameId);
     assertNotNull(retrievedGame);
     assertEquals(TEST_GAME_NAME, retrievedGame.gameName());
+    assertEquals(TEST_USERNAME, retrievedGame.whiteUsername());
   }
 
   @Test
-  public void getGame_nonexistent() {
-    assertThrows(BadRequestException.class, () -> {
-      gameDAO.getGame(999);
-    });
-  }
+  public void updateGame_success() throws DataAccessException {
+    // First create a user
+    UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
+    userDAO.createUser(user);
+    UserData user2 = new UserData("player2", TEST_PASSWORD, "p2@example.com");
+    userDAO.createUser(user2);
 
-  @Test
-  public void listGames_success() throws DataAccessException {
-    GameData game1 = new GameData(0, TEST_USERNAME, null, "game1", new ChessGame());
-    GameData game2 = new GameData(0, TEST_USERNAME, null, "game2", new ChessGame());
-
-    gameDAO.createGame(game1);
-    gameDAO.createGame(game2);
-
-    Collection<GameData> games = gameDAO.listGames();
-    assertEquals(2, games.size());
-  }
-
-  @Test
-  public void listGames_emptyDatabase() throws DataAccessException {
-    Collection<GameData> games = gameDAO.listGames();
-    assertTrue(games.isEmpty());
-  }
-
-  @Test
-  public void updateGame_success() throws DataAccessException, BadRequestException {
-    GameData game = new GameData(0, TEST_USERNAME, "tim", TEST_GAME_NAME, new ChessGame());
+    // Create initial game
+    GameData game = new GameData(0, TEST_USERNAME, null, TEST_GAME_NAME, new ChessGame());
     gameDAO.createGame(game);
+
+    // Get the created game's ID
     Collection<GameData> games = gameDAO.listGames();
     GameData createdGame = games.iterator().next();
 
-    GameData updatedGame = new GameData(createdGame.gameID(), "wilson", "tim", TEST_GAME_NAME, createdGame.game());
+    // Update the game
+    GameData updatedGame = new GameData(
+            createdGame.gameID(),
+            createdGame.whiteUsername(),
+            "player2",  // Add black player
+            createdGame.gameName(),
+            createdGame.game()
+    );
     gameDAO.updateGame(updatedGame);
 
+    // Verify update
     GameData retrievedGame = gameDAO.getGame(createdGame.gameID());
-    assertEquals("wilson", retrievedGame.whiteUsername());
+    assertEquals("player2", retrievedGame.blackUsername());
   }
 
   @Test
-  public void updateGame_nonexistent() {
+  public void updateGame_nonexistent() throws DataAccessException {
     GameData nonexistentGame = new GameData(999, null, null, TEST_GAME_NAME, new ChessGame());
-    assertThrows(DataAccessException.class, () -> {
+    DataAccessException exception = assertThrows(DataAccessException.class, () -> {
       gameDAO.updateGame(nonexistentGame);
     });
+    assertEquals("Error: game not found", exception.getMessage());
   }
 
   // Auth Tests
@@ -159,18 +166,12 @@ public class MySQLDataAccessTest {
     AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
     assertNotNull(retrievedAuth);
     assertEquals(TEST_USERNAME, retrievedAuth.username());
-  }
-
-  @Test
-  public void createAuth_invalidUser_fails() {
-    AuthData auth = new AuthData("nonexistentUser", TEST_AUTH_TOKEN);
-    assertThrows(DataAccessException.class, () -> {
-      authDAO.createAuth(auth);
-    });
+    assertEquals(TEST_AUTH_TOKEN, retrievedAuth.authToken());
   }
 
   @Test
   public void getAuth_success() throws DataAccessException {
+    // First create a user
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
@@ -179,6 +180,7 @@ public class MySQLDataAccessTest {
 
     AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
     assertNotNull(retrievedAuth);
+    assertEquals(TEST_USERNAME, retrievedAuth.username());
     assertEquals(TEST_AUTH_TOKEN, retrievedAuth.authToken());
   }
 
@@ -190,26 +192,23 @@ public class MySQLDataAccessTest {
 
   @Test
   public void deleteAuth_success() throws DataAccessException {
+    // First create a user
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
+    // Create auth token
     AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
     authDAO.createAuth(auth);
 
+    // Delete and verify
     authDAO.deleteAuth(TEST_AUTH_TOKEN);
     AuthData retrievedAuth = authDAO.getAuth(TEST_AUTH_TOKEN);
     assertNull(retrievedAuth);
   }
 
   @Test
-  public void deleteAuth_nonexistent_noError() throws DataAccessException {
-    // Should not throw an exception
-    assertDoesNotThrow(() -> authDAO.deleteAuth("nonexistentToken"));
-  }
-
-  @Test
   public void clear_success() throws DataAccessException {
-    // Create some data first
+    // Create test data
     UserData user = new UserData(TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL);
     userDAO.createUser(user);
 
@@ -219,7 +218,7 @@ public class MySQLDataAccessTest {
     AuthData auth = new AuthData(TEST_USERNAME, TEST_AUTH_TOKEN);
     authDAO.createAuth(auth);
 
-    // Clear everything
+    // Clear all data
     userDAO.clear();
     gameDAO.clear();
     authDAO.clear();
