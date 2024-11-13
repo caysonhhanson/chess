@@ -1,22 +1,23 @@
 package client;
 
+import chess.ChessGame;
 import com.google.gson.Gson;
-import model.AuthData;
-import model.GameData;
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Map;
+import model.GameData;
 
 public class ServerFacade {
-  private final String serverUrl;
-  private final Gson gson;
-  private String authToken;
+  String baseURL = "http://localhost:8080";
+  String authToken;
 
-  public ServerFacade(String serverUrl) {
-    this.serverUrl = serverUrl;
-    this.gson = new Gson();
+  ServerFacade() {
   }
+
 }
