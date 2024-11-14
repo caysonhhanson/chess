@@ -17,8 +17,14 @@ public class ServerFacade {
   String baseURL = "http://localhost:8080";
   String authToken;
 
-  ServerFacade() {
+  public ServerFacade() {
+    this.baseURL = "http://localhost:8080";
   }
+
+  public ServerFacade(int port) {
+    this.baseURL = "http://localhost:" + port;
+  }
+
   public boolean register(String username, String password, String email) {
     var text = Map.of("username", username, "password", password, "email", email);
     var jsonText = new Gson().toJson(text);
@@ -83,7 +89,6 @@ public class ServerFacade {
   public int createGame(String gameName) {
     var text = Map.of("gameName", gameName);
     var jsonText = new Gson().toJson(text);
-
     try {
       URI uri = new URI(baseURL + "/game");
       HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
@@ -93,13 +98,10 @@ public class ServerFacade {
         http.addRequestProperty("Authorization", authToken);
       }
       http.addRequestProperty("Content-Type", "application/json");
-
       try (var outputStream = http.getOutputStream()) {
         outputStream.write(jsonText.getBytes());
       }
-
       http.connect();
-
       if (http.getResponseCode() == 200) {
         try (InputStream respBody = http.getInputStream()) {
           InputStreamReader inputStreamReader = new InputStreamReader(respBody);
@@ -121,7 +123,6 @@ public class ServerFacade {
         http.addRequestProperty("Authorization", authToken);
       }
       http.connect();
-
       if (http.getResponseCode() == 200) {
         try (InputStream respBody = http.getInputStream()) {
           InputStreamReader inputStreamReader = new InputStreamReader(respBody);
@@ -147,4 +148,26 @@ public class ServerFacade {
     return new ArrayList<>();
   }
 
+  public boolean joinGame(int gameID, String playerColor) {
+    var text = Map.of("gameID", gameID, "playerColor", playerColor);
+    var jsonText = new Gson().toJson(text);
+    try {
+      URI uri = new URI(baseURL + "/game");
+      HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
+      http.setRequestMethod("PUT");
+      http.setDoOutput(true);
+      if (authToken != null) {
+        http.addRequestProperty("Authorization", authToken);
+      }
+      http.addRequestProperty("Content-Type", "application/json");
+
+      try (var outputStream = http.getOutputStream()) {
+        outputStream.write(jsonText.getBytes());
+      }
+      http.connect();
+      return http.getResponseCode() == 200;
+    } catch (URISyntaxException | IOException e) {
+      return false;
+    }
+  }
 }
