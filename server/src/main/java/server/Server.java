@@ -19,26 +19,38 @@ public class Server {
     }
 
     public int run(int desiredPort) {
-        Spark.stop();
-        Spark.awaitStop();
+        try {
+            // Set up dynamic database name for tests
+            if (desiredPort == 0) {
+                DatabaseManager.setDatabaseName("chessDb" + System.currentTimeMillis());
+            }
 
-        Spark.port(desiredPort);
-        Spark.staticFiles.location("web");
+            // Initialize database
+            DatabaseInitializer.initialize();
 
+            Spark.stop();
+            Spark.awaitStop();
 
-        var userHandler = new UserHandler(userService);
-        var gameHandler = new GameHandler(gameService);
+            Spark.port(desiredPort);
+            Spark.staticFiles.location("web");
 
-        Spark.delete("/db", gameHandler::handleClear);
-        Spark.post("/user", userHandler::handleRegister);
-        Spark.post("/session", userHandler::handleLogin);
-        Spark.delete("/session", userHandler::handleLogout);
-        Spark.get("/game", gameHandler::handleListGames);
-        Spark.post("/game", gameHandler::handleCreateGame);
-        Spark.put("/game", gameHandler::handleJoinGame);
+            var userHandler = new UserHandler(userService);
+            var gameHandler = new GameHandler(gameService);
 
-        Spark.awaitInitialization();
-        return Spark.port();
+            Spark.delete("/db", gameHandler::handleClear);
+            Spark.post("/user", userHandler::handleRegister);
+            Spark.post("/session", userHandler::handleLogin);
+            Spark.delete("/session", userHandler::handleLogout);
+            Spark.get("/game", gameHandler::handleListGames);
+            Spark.post("/game", gameHandler::handleCreateGame);
+            Spark.put("/game", gameHandler::handleJoinGame);
+
+            Spark.awaitInitialization();
+            return Spark.port();
+        } catch (DataAccessException e) {
+            System.err.println("Failed to initialize database: " + e.getMessage());
+            return -1;
+        }
     }
 
     public void stop() {
@@ -46,5 +58,4 @@ public class Server {
         Spark.awaitStop();
     }
 }
-
 
