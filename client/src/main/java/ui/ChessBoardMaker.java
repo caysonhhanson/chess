@@ -1,8 +1,61 @@
 package ui;
 
-import chess.ChessBoard;
+import chess.*;
+import static ui.EscapeSequences.*;
 
 public class ChessBoardMaker {
-  public static void drawBoard(ChessBoard board, boolean b) {
+  public static void drawBoard(ChessBoard board, boolean blackPerspective) {
+    drawHeaderFooter(blackPerspective);
+    drawBoardBody(board, blackPerspective);
+    drawHeaderFooter(blackPerspective);
+  }
+
+  private static void drawHeaderFooter(boolean blackPerspective) {
+    System.out.print("    ");
+    char[] columns = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+    if (blackPerspective) {
+      for (int i = columns.length - 1; i >= 0; i--) {
+        System.out.print(SET_TEXT_BOLD + SET_TEXT_COLOR_BLACK + columns[i] + "  " + RESET_TEXT_BOLD_FAINT);
+      }
+    } else {
+      for (char column : columns) {
+        System.out.print(SET_TEXT_BOLD + SET_TEXT_COLOR_BLACK + column + "  " + RESET_TEXT_BOLD_FAINT);
+      }
+    }
+    System.out.println();
+  }
+
+  private static void drawBoardBody(ChessBoard board, boolean blackPerspective) {
+    for (int row = 8; row >= 1; row--) {
+      int displayRow = blackPerspective ? 9 - row : row;
+      System.out.print(" " + displayRow + "  ");
+
+      for (int col = 1; col <= 8; col++) {
+        int displayCol = blackPerspective ? 9 - col : col;
+        boolean isLightSquare = (displayRow + displayCol) % 2 == 0;
+
+        String bgColor = isLightSquare ? SET_BG_COLOR_WHITE : SET_BG_COLOR_BLACK;
+        System.out.print(bgColor);
+
+        ChessPosition position = new ChessPosition(row, col);
+        ChessPiece piece = board.getPiece(position);
+        System.out.print(getPieceString(piece));
+        System.out.print(RESET_BG_COLOR);
+      }
+      System.out.println("  " + displayRow);
+    }
+  }
+
+  private static String getPieceString(ChessPiece piece) {
+    if (piece == null) return EMPTY;
+
+    return switch (piece.getPieceType()) {
+      case KING -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_KING : BLACK_KING;
+      case QUEEN -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_QUEEN : BLACK_QUEEN;
+      case BISHOP -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_BISHOP : BLACK_BISHOP;
+      case KNIGHT -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_KNIGHT : BLACK_KNIGHT;
+      case ROOK -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_ROOK : BLACK_ROOK;
+      case PAWN -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_PAWN : BLACK_PAWN;
+    };
   }
 }
