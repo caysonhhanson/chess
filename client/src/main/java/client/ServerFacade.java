@@ -20,9 +20,9 @@ public class ServerFacade {
   ServerFacade() {
   }
   public boolean register(String username, String password, String email) {
-    var body = Map.of("username", username, "password", password, "email", email);
-    var jsonBody = new Gson().toJson(body);
-    return post("/user", jsonBody);
+    var text = Map.of("username", username, "password", password, "email", email);
+    var jsonText = new Gson().toJson(text);
+    return post("/user", jsonText);
   }
 
   public boolean post(String endpoint, String body) {
@@ -51,5 +51,32 @@ public class ServerFacade {
       return false;
     }
     return true;
+  }
+
+  public boolean login(String username, String password) {
+    var text = Map.of("username", username, "password", password);
+    var jsonText = new Gson().toJson(text);
+    return post("/session", jsonText);
+  }
+
+  public boolean logout() {
+    try {
+      URI uri = new URI(baseURL + "/session");
+      HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
+      http.setRequestMethod("DELETE");
+      http.setDoOutput(true);
+      if (authToken != null) {
+        http.addRequestProperty("Authorization", authToken);
+      }
+      http.connect();
+
+      if (http.getResponseCode() == 200) {
+        authToken = null;
+        return true;
+      }
+    } catch (URISyntaxException | IOException e) {
+      return false;
+    }
+    return false;
   }
 }
