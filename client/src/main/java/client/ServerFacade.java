@@ -79,4 +79,72 @@ public class ServerFacade {
     }
     return false;
   }
+
+  public int createGame(String gameName) {
+    var text = Map.of("gameName", gameName);
+    var jsonText = new Gson().toJson(text);
+
+    try {
+      URI uri = new URI(baseURL + "/game");
+      HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
+      http.setRequestMethod("POST");
+      http.setDoOutput(true);
+      if (authToken != null) {
+        http.addRequestProperty("Authorization", authToken);
+      }
+      http.addRequestProperty("Content-Type", "application/json");
+
+      try (var outputStream = http.getOutputStream()) {
+        outputStream.write(jsonText.getBytes());
+      }
+
+      http.connect();
+
+      if (http.getResponseCode() == 200) {
+        try (InputStream respBody = http.getInputStream()) {
+          InputStreamReader inputStreamReader = new InputStreamReader(respBody);
+          return ((Double) new Gson().fromJson(inputStreamReader, Map.class).get("gameID")).intValue();
+        }
+      }
+    } catch (URISyntaxException | IOException e) {
+      return -1;
+    }
+    return -1;
+  }
+
+  public Collection<GameData> listGames() {
+    try {
+      URI uri = new URI(baseURL + "/game");
+      HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
+      http.setRequestMethod("GET");
+      if (authToken != null) {
+        http.addRequestProperty("Authorization", authToken);
+      }
+      http.connect();
+
+      if (http.getResponseCode() == 200) {
+        try (InputStream respBody = http.getInputStream()) {
+          InputStreamReader inputStreamReader = new InputStreamReader(respBody);
+          var response = new Gson().fromJson(inputStreamReader, Map.class);
+          var games = (ArrayList<?>) response.get("games");
+          Collection<GameData> result = new ArrayList<>();
+          for (var game : games) {
+            Map<?, ?> gameMap = (Map<?, ?>) game;
+            result.add(new GameData(
+                    ((Double) gameMap.get("gameID")).intValue(),
+                    (String) gameMap.get("whiteUsername"),
+                    (String) gameMap.get("blackUsername"),
+                    (String) gameMap.get("gameName"),
+                    new ChessGame()
+            ));
+          }
+          return result;
+        }
+      }
+    } catch (URISyntaxException | IOException e) {
+      return new ArrayList<>();
+    }
+    return new ArrayList<>();
+  }
+
 }
