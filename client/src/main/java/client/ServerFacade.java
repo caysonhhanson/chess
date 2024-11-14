@@ -17,9 +17,6 @@ public class ServerFacade {
   String baseURL = "http://localhost:8080";
   String authToken;
 
-  public ServerFacade() {
-    this.baseURL = "http://localhost:8080";
-  }
 
   public ServerFacade(int port) {
     this.baseURL = "http://localhost:" + port;
