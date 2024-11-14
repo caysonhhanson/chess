@@ -5,7 +5,7 @@ public class Main {
   private static final int DEFAULT_PORT = 8080;
 
   public static void main(String[] args) throws Exception {
-    System.out.println("240 Chess Client:");
+    System.out.println("240 Chess Clients:");
 
     int port = DEFAULT_PORT;
     if (args.length > 0) {
