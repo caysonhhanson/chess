@@ -10,47 +10,44 @@ public class Server {
     private final GameService gameService;
 
     public Server() {
-        var userDAO = new SQLUserDAO();
-        var authDAO = new SQLAuthDAO();
-        var gameDAO = new SQLGameDAO();
-
-        userService = new UserService(userDAO, authDAO);
-        gameService = new GameService(userDAO, gameDAO, authDAO);
+        try {
+            DatabaseInitializer.initialize();
+            var userDAO = new SQLUserDAO();
+            var authDAO = new SQLAuthDAO();
+            var gameDAO = new SQLGameDAO();
+            userService = new UserService(userDAO, authDAO);
+            gameService = new GameService(userDAO, gameDAO, authDAO);
+        } catch (DataAccessException e) {
+            System.err.println("Failed to initialize server: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 
     public int run(int desiredPort) {
-        try {
-            // Set up dynamic database name for tests
-            if (desiredPort == 0) {
-                DatabaseManager.setDatabaseName("chessDb" + System.currentTimeMillis());
+        Spark.port(desiredPort);
+        Spark.staticFiles.location("web");
+
+        Spark.options("/*", (request, response) -> {
+            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
             }
+            return "OK";
+        });
 
-            // Initialize database
-            DatabaseInitializer.initialize();
+        var userHandler = new UserHandler(userService);
+        var gameHandler = new GameHandler(gameService);
 
-            Spark.stop();
-            Spark.awaitStop();
+        Spark.delete("/db", gameHandler::handleClear);
+        Spark.post("/user", userHandler::handleRegister);
+        Spark.post("/session", userHandler::handleLogin);
+        Spark.delete("/session", userHandler::handleLogout);
+        Spark.get("/game", gameHandler::handleListGames);
+        Spark.post("/game", gameHandler::handleCreateGame);
+        Spark.put("/game", gameHandler::handleJoinGame);
 
-            Spark.port(desiredPort);
-            Spark.staticFiles.location("web");
-
-            var userHandler = new UserHandler(userService);
-            var gameHandler = new GameHandler(gameService);
-
-            Spark.delete("/db", gameHandler::handleClear);
-            Spark.post("/user", userHandler::handleRegister);
-            Spark.post("/session", userHandler::handleLogin);
-            Spark.delete("/session", userHandler::handleLogout);
-            Spark.get("/game", gameHandler::handleListGames);
-            Spark.post("/game", gameHandler::handleCreateGame);
-            Spark.put("/game", gameHandler::handleJoinGame);
-
-            Spark.awaitInitialization();
-            return Spark.port();
-        } catch (DataAccessException e) {
-            System.err.println("Failed to initialize database: " + e.getMessage());
-            return -1;
-        }
+        Spark.awaitInitialization();
+        return Spark.port();
     }
 
     public void stop() {
