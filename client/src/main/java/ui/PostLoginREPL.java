@@ -56,7 +56,7 @@ public class PostLoginREPL {
     for (int i = 0; i < gameCache.size(); i++) {
       var game = gameCache.get(i);
       System.out.printf("%d: %s (W: %s, B: %s)%n",
-              i, game.gameName(),
+              i + 1, game.gameName(),
               game.whiteUsername() != null ? game.whiteUsername() : "OPEN",
               game.blackUsername() != null ? game.blackUsername() : "OPEN");
     }
@@ -99,7 +99,7 @@ public class PostLoginREPL {
   }
 
   private int getGameId(String input) {
-    int index = Integer.parseInt(input);
+    int index = Integer.parseInt(input) - 1;
     if (index < 0 || index >= gameCache.size()) {
       throw new IllegalArgumentException("Invalid game index");
     }

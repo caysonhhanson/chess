@@ -70,7 +70,9 @@ public class ServerFacade {
   }
 
   public boolean logout() {
-    if (authToken == null) return false;
+    if (authToken == null) {
+      return false;
+    }
 
     try {
       URI uri = new URI(baseURL + "/session");
@@ -91,7 +93,9 @@ public class ServerFacade {
   }
 
   public int createGame(String gameName) {
-    if (authToken == null) return -1;
+    if (authToken == null) {
+      return -1;
+    }
 
     try {
       URI uri = new URI(baseURL + "/game");
@@ -119,7 +123,9 @@ public class ServerFacade {
   }
 
   public HashSet<GameData> listGames() {
-    if (authToken == null) return new HashSet<>();
+    if (authToken == null) {
+      return new HashSet<>();
+    }
 
     try {
       URI uri = new URI(baseURL + "/game");
@@ -155,7 +161,9 @@ public class ServerFacade {
   }
 
   public boolean joinGame(int gameID, String playerColor) {
-    if (authToken == null) return false;
+    if (authToken == null) {
+      return false;
+    }
 
     try {
       URI uri = new URI(baseURL + "/game");

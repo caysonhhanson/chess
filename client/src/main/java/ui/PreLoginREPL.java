@@ -21,7 +21,9 @@ public class PreLoginREPL {
       System.out.print("\n[OUT] >> ");
       String[] args = scanner.nextLine().toLowerCase().split(" ");
 
-      if (args[0].equals("quit")) break;
+      if (args[0].equals("quit")) {
+        break;
+      }
 
       if (processCommand(args)) {
         postLogin.run();

@@ -15,11 +15,11 @@ public class ChessBoardMaker {
     char[] columns = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
     if (blackPerspective) {
       for (int i = columns.length - 1; i >= 0; i--) {
-        System.out.print(SET_TEXT_BOLD + SET_TEXT_COLOR_BLACK + columns[i] + "  " + RESET_TEXT_BOLD_FAINT);
+        System.out.print(SET_TEXT_BOLD + SET_TEXT_COLOR_BLUE + columns[i] + "  " + RESET_TEXT_BOLD_FAINT);
       }
     } else {
       for (char column : columns) {
-        System.out.print(SET_TEXT_BOLD + SET_TEXT_COLOR_BLACK + column + "  " + RESET_TEXT_BOLD_FAINT);
+        System.out.print(SET_TEXT_BOLD + SET_TEXT_COLOR_BLUE + column + "  " + RESET_TEXT_BOLD_FAINT);
       }
     }
     System.out.println();
@@ -28,26 +28,37 @@ public class ChessBoardMaker {
   private static void drawBoardBody(ChessBoard board, boolean blackPerspective) {
     for (int row = 8; row >= 1; row--) {
       int displayRow = blackPerspective ? 9 - row : row;
-      System.out.print(" " + displayRow + "  ");
+      System.out.print(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + " " + displayRow + "  " + RESET_TEXT_BOLD_FAINT);
 
       for (int col = 1; col <= 8; col++) {
         int displayCol = blackPerspective ? 9 - col : col;
         boolean isLightSquare = (displayRow + displayCol) % 2 == 0;
 
-        String bgColor = isLightSquare ? SET_BG_COLOR_WHITE : SET_BG_COLOR_BLACK;
-        System.out.print(bgColor);
+        String bgColor = isLightSquare ? SET_BG_COLOR_WHITE : SET_BG_COLOR_DARK_GREY;
 
         ChessPosition position = new ChessPosition(row, col);
         ChessPiece piece = board.getPiece(position);
+
+        String textColor;
+        if (piece != null) {
+          textColor = piece.getTeamColor() == ChessGame.TeamColor.WHITE ?
+                  SET_TEXT_COLOR_BLUE : SET_TEXT_COLOR_RED;
+        } else {
+          textColor = SET_TEXT_COLOR_BLACK;
+        }
+
+        System.out.print(bgColor + textColor);
         System.out.print(getPieceString(piece));
         System.out.print(RESET_BG_COLOR);
       }
-      System.out.println("  " + displayRow);
+      System.out.println(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + "  " + displayRow + RESET_TEXT_BOLD_FAINT);
     }
   }
 
   private static String getPieceString(ChessPiece piece) {
-    if (piece == null) return EMPTY;
+    if (piece == null) {
+      return EMPTY;
+    }
 
     return switch (piece.getPieceType()) {
       case KING -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_KING : BLACK_KING;
