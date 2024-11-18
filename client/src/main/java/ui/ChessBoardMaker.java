@@ -4,15 +4,6 @@ import chess.*;
 import static ui.EscapeSequences.*;
 
 public class ChessBoardMaker {
-  public static void drawInitialBoards() {
-    ChessBoard board = new ChessBoard();
-    board.resetBoard();
-
-    System.out.println("Black Perspective (Black pieces on bottom):");
-    drawBoard(board, true);
-    System.out.println("\nWhite Perspective (White pieces on bottom):");
-    drawBoard(board, false);
-  }
 
   public static void drawBoard(ChessBoard board, boolean blackPerspective) {
     drawHeaderFooter(blackPerspective);
