@@ -4,6 +4,16 @@ import chess.*;
 import static ui.EscapeSequences.*;
 
 public class ChessBoardMaker {
+  public static void drawInitialBoards() {
+    ChessBoard board = new ChessBoard();
+    board.resetBoard();
+
+    System.out.println("Black Perspective (Black pieces on bottom):");
+    drawBoard(board, true);
+    System.out.println("\nWhite Perspective (White pieces on bottom):");
+    drawBoard(board, false);
+  }
+
   public static void drawBoard(ChessBoard board, boolean blackPerspective) {
     drawHeaderFooter(blackPerspective);
     drawBoardBody(board, blackPerspective);
@@ -26,28 +36,45 @@ public class ChessBoardMaker {
   }
 
   private static void drawBoardBody(ChessBoard board, boolean blackPerspective) {
-    for (int row = 8; row >= 1; row--) {
-      int displayRow = row;
-      System.out.print(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + " " + displayRow + "  " + RESET_TEXT_BOLD_FAINT);
+    int startRow = blackPerspective ? 1 : 8;
+    int endRow = blackPerspective ? 8 : 1;
+    int increment = blackPerspective ? 1 : -1;
+
+    for (int row = startRow; blackPerspective ? row <= endRow : row >= endRow; row += increment) {
+      // Display row number
+      System.out.print(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + " " + row + "  " + RESET_TEXT_BOLD_FAINT);
 
       for (int col = 1; col <= 8; col++) {
         int displayCol = blackPerspective ? 9 - col : col;
-        boolean isLightSquare = (displayRow + displayCol) % 2 == 1;
+        boolean isLightSquare = ((row + displayCol) % 2 == 1);
 
         String bgColor = isLightSquare ? SET_BG_COLOR_WHITE : SET_BG_COLOR_DARK_GREY;
         System.out.print(bgColor);
 
-        ChessPosition position = new ChessPosition(row, blackPerspective ? 9 - col : col);
+        ChessPosition position;
+        if (blackPerspective) {
+          position = new ChessPosition(9 - row, 9 - col);
+        } else {
+          position = new ChessPosition(row, col);
+        }
+
         ChessPiece piece = board.getPiece(position);
 
-        String textColor = piece != null && piece.getTeamColor() == ChessGame.TeamColor.WHITE ?
-                SET_TEXT_COLOR_BLUE : SET_TEXT_COLOR_RED;
-        System.out.print(textColor);
+        String textColor;
+        if (piece != null) {
+          boolean isPieceWhite = piece.getTeamColor() == ChessGame.TeamColor.WHITE;
+          if (blackPerspective) {
+            textColor = isPieceWhite ? SET_TEXT_COLOR_RED : SET_TEXT_COLOR_BLUE;
+          } else {
+            textColor = isPieceWhite ? SET_TEXT_COLOR_BLUE : SET_TEXT_COLOR_RED;
+          }
+          System.out.print(textColor);
+        }
 
         System.out.print(getPieceString(piece));
         System.out.print(RESET_BG_COLOR);
       }
-      System.out.println(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + "  " + displayRow + RESET_TEXT_BOLD_FAINT);
+      System.out.println(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + "  " + row + RESET_TEXT_BOLD_FAINT);
     }
   }
 
