@@ -6,39 +6,35 @@ import java.util.*;
 
 public class PreLoginREPL {
   private final ServerFacade facade;
-  private final  ui.PostLoginREPL postLogin;
+  private final PostLoginREPL postLogin;
 
   public PreLoginREPL(ServerFacade facade) {
     this.facade = facade;
-    this.postLogin = new ui.PostLoginREPL(facade);
+    this.postLogin = new PostLoginREPL(facade);
   }
 
   public void run() {
     var scanner = new Scanner(System.in);
     System.out.println(RESET_TEXT_COLOR + RESET_BG_COLOR + "Chess Game - Type 'help' for commands");
 
-    while (true) {
+    boolean loggedIn = false;
+    while (!loggedIn) {
       System.out.print("\n[OUT] >> ");
       String[] args = scanner.nextLine().toLowerCase().split(" ");
 
       if (args[0].equals("quit")) {
-        break;
+        return;
       }
 
-      if (processCommand(args)) {
-        postLogin.run();
-        break;
+      switch (args[0]) {
+        case "help" -> printCommands();
+        case "login" -> loggedIn = handleLogin(args);
+        case "register" -> loggedIn = handleRegistration(args);
+        default -> System.out.println("Unknown command - try 'help'");
       }
     }
-  }
 
-  private boolean processCommand(String[] args) {
-    return switch (args[0]) {
-      case "help" -> { printCommands(); yield false; }
-      case "login" -> handleLogin(args);
-      case "register" -> handleRegistration(args);
-      default -> { System.out.println("Unknown command - try 'help'"); yield false; }
-    };
+    postLogin.run();
   }
 
   private boolean handleLogin(String[] args) {

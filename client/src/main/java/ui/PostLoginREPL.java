@@ -22,6 +22,10 @@ public class PostLoginREPL {
       String[] args = scanner.nextLine().toLowerCase().split(" ");
       processCommand(args);
     }
+
+    // After logout, go back to PreLoginREPL
+    PreLoginREPL preLogin = new PreLoginREPL(facade);
+    preLogin.run();
   }
 
   private void processCommand(String[] args) {
@@ -56,7 +60,8 @@ public class PostLoginREPL {
     for (int i = 0; i < gameCache.size(); i++) {
       var game = gameCache.get(i);
       System.out.printf("%d: %s (W: %s, B: %s)%n",
-              i + 1, game.gameName(),
+              i + 1,
+              game.gameName(),
               game.whiteUsername() != null ? game.whiteUsername() : "OPEN",
               game.blackUsername() != null ? game.blackUsername() : "OPEN");
     }
