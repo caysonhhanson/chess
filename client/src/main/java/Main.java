@@ -2,7 +2,7 @@ import client.ServerFacade;
 import ui.PreLoginREPL;
 
 public class Main {
-  private static final int DEFAULT_PORT = 8080;
+  private static final int DEFAULT_PORT = 8081;
 
   public static void main(String[] args) throws Exception {
     System.out.println("240 Chess Clients:");

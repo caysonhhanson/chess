@@ -63,25 +63,30 @@ public class GameService {
       throw new UnauthorizedException("Error: unauthorized");
     }
 
-    GameData game = gameDAO.getGame(gameID);
-    if (game == null) {
-      throw new BadRequestException("Error: bad request");
+    GameData game;
+    try {
+      game = gameDAO.getGame(gameID);
+      if (game == null) {
+        throw new BadRequestException("Error: game not found");
+      }
+    } catch (DataAccessException | BadRequestException e) {
+      throw new BadRequestException("Error: game not found");
     }
 
     if (playerColor == null) {
-      throw new BadRequestException("Error: bad request");
+      return;
     }
 
     switch (playerColor.toUpperCase()) {
       case "WHITE" -> {
-        if (game.whiteUsername() != null) {
+        if (game.whiteUsername() != null && !game.whiteUsername().equals(auth.username())) {
           throw new AlreadyTakenException("Error: already taken");
         }
         game = new GameData(game.gameID(), auth.username(), game.blackUsername(),
                 game.gameName(), game.game());
       }
       case "BLACK" -> {
-        if (game.blackUsername() != null) {
+        if (game.blackUsername() != null && !game.blackUsername().equals(auth.username())) {
           throw new AlreadyTakenException("Error: already taken");
         }
         game = new GameData(game.gameID(), game.whiteUsername(), auth.username(),
@@ -93,4 +98,3 @@ public class GameService {
     gameDAO.updateGame(game);
   }
 }
-

@@ -1,7 +1,6 @@
 package ui;
 
 import client.ServerFacade;
-import static ui.EscapeSequences.*;
 import java.util.*;
 
 public class PostLoginREPL {
