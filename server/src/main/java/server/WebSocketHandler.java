@@ -5,16 +5,18 @@ import com.google.gson.Gson;
 import dataaccess.*;
 import model.AuthData;
 import model.GameData;
+import org.eclipse.jetty.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.WebSocketAdapter;
+import org.eclipse.jetty.websocket.api.annotations.*;
 import websocket.commands.*;
 import websocket.messages.*;
+import websocket.messages.Error;
 
-import javax.websocket.*;
-import javax.websocket.server.ServerEndpoint;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@ServerEndpoint("/ws")
-public class WebSocketHandler {
+@WebSocket
+public class WebSocketHandler extends WebSocketAdapter {
   private static final Map<Integer, Map<Session, String>> gameConnections = new ConcurrentHashMap<>();
   private final GameDAO gameDAO;
   private final AuthDAO authDAO;
@@ -25,29 +27,54 @@ public class WebSocketHandler {
     this.authDAO = authDAO;
   }
 
-  @OnOpen
-  public void onOpen(Session session) {}
+  @OnWebSocketConnect
+  @Override
+  public void onWebSocketConnect(Session session) {
+    super.onWebSocketConnect(session);
+  }
 
-  @OnMessage
-  public void onMessage(String message, Session session) {
+  @OnWebSocketClose
+  @Override
+  public void onWebSocketClose(int statusCode, String reason) {
+    Session session = getSession();
+    if (session != null) {
+      gameConnections.values().forEach(sessions -> {
+        String username = sessions.remove(session);
+        if (username != null) {
+          broadcast(sessions, gson.toJson(new Notification(username + " disconnected")));
+        }
+      });
+    }
+    super.onWebSocketClose(statusCode, reason);
+  }
+
+  @OnWebSocketMessage
+  public void onWebSocketMessage(String message) {
     try {
       UserGameCommand command = gson.fromJson(message, UserGameCommand.class);
       AuthData auth = authDAO.getAuth(command.getAuthToken());
 
       if (auth == null) {
-        sendError(session, "Error: unauthorized");
+        sendError(getSession(), "Error: unauthorized");
         return;
       }
 
       switch (command.getCommandType()) {
-        case CONNECT -> handleConnect(session, command, auth);
-        case MAKE_MOVE -> handleMove(session, command, auth);
-        case RESIGN -> handleResign(session, command, auth);
-        case LEAVE -> handleLeave(session, command);
+        case CONNECT -> handleConnect(getSession(), command, auth);
+        case MAKE_MOVE -> handleMove(getSession(), command, auth);
+        case RESIGN -> handleResign(getSession(), command, auth);
+        case LEAVE -> handleLeave(getSession(), command);
       }
     } catch (Exception e) {
-      sendError(session, "Error: " + e.getMessage());
+      sendError(getSession(), "Error: " + e.getMessage());
     }
+  }
+
+  @OnWebSocketError
+  @Override
+  public void onWebSocketError(Throwable cause) {
+    System.err.println("WebSocket Error: " + cause.getMessage());
+    super.onWebSocketError(cause);
   }
 
   private void handleConnect(Session session, UserGameCommand command, AuthData auth) throws Exception {
@@ -82,14 +109,11 @@ public class WebSocketHandler {
       return;
     }
 
-    // Verify game isn't over
-    if (game.game().isInCheckmate(game.game().getTeamTurn()) ||
-            game.game().isInStalemate(game.game().getTeamTurn())) {
+    if (isGameOver(game.game())) {
       sendError(session, "Error: game is already over");
       return;
     }
 
-    // Verify correct player's turn
     ChessGame.TeamColor currentTurn = game.game().getTeamTurn();
     String expectedPlayer = currentTurn == ChessGame.TeamColor.WHITE ?
             game.whiteUsername() : game.blackUsername();
@@ -100,7 +124,6 @@ public class WebSocketHandler {
     }
 
     try {
-      // Handle pawn promotion
       ChessMove move = moveCommand.getMove();
       if (isPawnPromotion(game.game(), move)) {
         move = new ChessMove(move.getStartPosition(), move.getEndPosition(),
@@ -121,6 +144,11 @@ public class WebSocketHandler {
     } catch (InvalidMoveException e) {
       sendError(session, "Error: invalid move");
     }
+  }
+
+  private boolean isGameOver(ChessGame game) {
+    ChessGame.TeamColor currentTeam = game.getTeamTurn();
+    return game.isInCheckmate(currentTeam) || game.isInStalemate(currentTeam);
   }
 
   private boolean isPawnPromotion(ChessGame game, ChessMove move) {
@@ -172,18 +200,16 @@ public class WebSocketHandler {
   }
 
   private void sendError(Session session, String message) {
-    websocket.messages.Error error = new websocket.messages.Error(message);
     try {
-      session.getBasicRemote().sendText(gson.toJson(error));
+      session.getRemote().sendString(gson.toJson(new Error(message)));
     } catch (Exception e) {
       System.err.println("Error sending error message: " + e.getMessage());
     }
   }
 
   private void sendLoadGame(Session session, ChessGame game) {
-    LoadGame loadGame = new LoadGame(game);
     try {
-      session.getBasicRemote().sendText(gson.toJson(loadGame));
+      session.getRemote().sendString(gson.toJson(new LoadGame(game)));
     } catch (Exception e) {
       System.err.println("Error sending game state: " + e.getMessage());
     }
@@ -191,34 +217,23 @@ public class WebSocketHandler {
 
   private void broadcastGameUpdate(int gameId, ChessGame game) {
     LoadGame loadGame = new LoadGame(game);
-    broadcast(gameId, gson.toJson(loadGame));
+    broadcast(gameConnections.get(gameId), gson.toJson(loadGame));
   }
 
   private void broadcastNotification(int gameId, String message) {
     Notification notification = new Notification(message);
-    broadcast(gameId, gson.toJson(notification));
+    broadcast(gameConnections.get(gameId), gson.toJson(notification));
   }
 
-  private void broadcast(int gameId, String message) {
-    Map<Session, String> gameSessions = gameConnections.get(gameId);
-    if (gameSessions != null) {
-      for (Session session : gameSessions.keySet()) {
+  private void broadcast(Map<Session, String> sessions, String message) {
+    if (sessions != null) {
+      for (Session session : sessions.keySet()) {
         try {
-          session.getBasicRemote().sendText(message);
+          session.getRemote().sendString(message);
         } catch (Exception e) {
           System.err.println("Error broadcasting message: " + e.getMessage());
         }
       }
     }
-  }
-
-  @OnClose
-  public void onClose(Session session) {
-    gameConnections.values().forEach(sessions -> sessions.remove(session));
-  }
-
-  @OnError
-  public void onError(Session session, Throwable throwable) {
-    System.err.println("WebSocket error: " + throwable.getMessage());
   }
 }
