@@ -1,7 +1,6 @@
 package server;
 
-import chess.ChessGame;
-import chess.InvalidMoveException;
+import chess.*;
 import com.google.gson.Gson;
 import dataaccess.*;
 import model.AuthData;
@@ -27,9 +26,7 @@ public class WebSocketHandler {
   }
 
   @OnOpen
-  public void onOpen(Session session) {
-    // Connection established
-  }
+  public void onOpen(Session session) {}
 
   @OnMessage
   public void onMessage(String message, Session session) {
@@ -85,6 +82,14 @@ public class WebSocketHandler {
       return;
     }
 
+    // Verify game isn't over
+    if (game.game().isInCheckmate(game.game().getTeamTurn()) ||
+            game.game().isInStalemate(game.game().getTeamTurn())) {
+      sendError(session, "Error: game is already over");
+      return;
+    }
+
+    // Verify correct player's turn
     ChessGame.TeamColor currentTurn = game.game().getTeamTurn();
     String expectedPlayer = currentTurn == ChessGame.TeamColor.WHITE ?
             game.whiteUsername() : game.blackUsername();
@@ -95,15 +100,22 @@ public class WebSocketHandler {
     }
 
     try {
-      game.game().makeMove(moveCommand.getMove());
+      // Handle pawn promotion
+      ChessMove move = moveCommand.getMove();
+      if (isPawnPromotion(game.game(), move)) {
+        move = new ChessMove(move.getStartPosition(), move.getEndPosition(),
+                ChessPiece.PieceType.QUEEN);
+      }
+
+      game.game().makeMove(move);
       gameDAO.updateGame(game);
 
       broadcastGameUpdate(command.getGameID(), game.game());
       broadcastNotification(command.getGameID(),
               String.format("%s moved %s to %s",
                       auth.username(),
-                      moveCommand.getMove().getStartPosition(),
-                      moveCommand.getMove().getEndPosition()));
+                      move.getStartPosition(),
+                      move.getEndPosition()));
 
       checkGameState(game, command.getGameID());
     } catch (InvalidMoveException e) {
@@ -111,14 +123,23 @@ public class WebSocketHandler {
     }
   }
 
+  private boolean isPawnPromotion(ChessGame game, ChessMove move) {
+    ChessPosition start = move.getStartPosition();
+    ChessPosition end = move.getEndPosition();
+    ChessPiece piece = game.getBoard().getPiece(start);
+
+    return piece != null &&
+            piece.getPieceType() == ChessPiece.PieceType.PAWN &&
+            ((piece.getTeamColor() == ChessGame.TeamColor.WHITE && end.getRow() == 8) ||
+                    (piece.getTeamColor() == ChessGame.TeamColor.BLACK && end.getRow() == 1));
+  }
+
   private void checkGameState(GameData game, int gameId) {
     ChessGame.TeamColor currentTeam = game.game().getTeamTurn();
-    if (game.game().isInCheck(currentTeam)) {
-      if (game.game().isInCheckmate(currentTeam)) {
-        broadcastNotification(gameId, currentTeam + " is in checkmate!");
-      } else {
-        broadcastNotification(gameId, currentTeam + " is in check!");
-      }
+    if (game.game().isInCheckmate(currentTeam)) {
+      broadcastNotification(gameId, currentTeam + " is in checkmate!");
+    } else if (game.game().isInCheck(currentTeam)) {
+      broadcastNotification(gameId, currentTeam + " is in check!");
     } else if (game.game().isInStalemate(currentTeam)) {
       broadcastNotification(gameId, "Game is in stalemate!");
     }
