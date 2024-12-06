@@ -28,6 +28,7 @@ public class WebSocketDecoder {
     this.errorHandler = errorHandler;
     this.gson = new GsonBuilder().create();
 
+    // Custom deserializer to handle polymorphic ServerMessage types
     JsonDeserializer<ServerMessage> deserializer = (json, typeOfT, context) -> {
       JsonObject jsonObject = json.getAsJsonObject();
       String type = jsonObject.get("serverMessageType").getAsString();
@@ -47,7 +48,7 @@ public class WebSocketDecoder {
 
   public void connect() throws Exception {
     WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-    session = container.connectToServer(this, new URI(serverUrl));
+    this.session = container.connectToServer(this, new URI(serverUrl));
   }
 
   public void disconnect() {
@@ -55,7 +56,7 @@ public class WebSocketDecoder {
       try {
         session.close();
       } catch (Exception e) {
-        System.err.println("Error closing WebSocket: " + e.getMessage());
+        errorHandler.accept("Error closing connection: " + e.getMessage());
       }
     }
   }
@@ -64,6 +65,8 @@ public class WebSocketDecoder {
     if (session != null && session.isOpen()) {
       String jsonCommand = gson.toJson(command);
       session.getAsyncRemote().sendText(jsonCommand);
+    } else {
+      errorHandler.accept("Error: Not connected to server");
     }
   }
 

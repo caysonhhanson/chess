@@ -29,7 +29,6 @@ public class GameplayREPL {
     );
   }
 
-
   public void run() {
     try {
       webSocket.connect();
@@ -86,14 +85,14 @@ public class GameplayREPL {
 
   private void displayHelp() {
     System.out.println("""
-            Available commands:
-            help - Show this help message
-            board - Redraw the chess board
-            move <start> <end> - Make a move (e.g., 'move e2 e4')
-            highlight <position> - Show legal moves for piece (e.g., 'highlight e2')
-            resign - Resign from the game
-            leave - Leave the game
-            quit - Exit to main menu""");
+                Available commands:
+                help - Show this help message
+                board - Redraw the chess board
+                move <start> <end> - Make a move (e.g., 'move e2 e4')
+                highlight <position> - Show legal moves for piece (e.g., 'highlight e2')
+                resign - Resign from the game
+                leave - Leave the game
+                quit - Exit to main menu""");
   }
 
   private void redrawBoard() {

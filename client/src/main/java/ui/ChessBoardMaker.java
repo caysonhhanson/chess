@@ -1,16 +1,14 @@
 package ui;
 
 import chess.*;
-import java.util.Collection;
 import static ui.EscapeSequences.*;
+import java.util.Collection;
 import java.util.Queue;
 import java.util.LinkedList;
-
 
 public class ChessBoardMaker {
   private static final Queue<String> notifications = new LinkedList<>();
   private static final int MAX_NOTIFICATIONS = 5;
-
 
   public static void addNotification(String message) {
     notifications.offer(message);
@@ -23,12 +21,10 @@ public class ChessBoardMaker {
     drawNotifications();
     System.out.println();
 
-
     drawHeaderFooter(blackPerspective);
     drawBoardBody(board, blackPerspective, highlights);
     drawHeaderFooter(blackPerspective);
   }
-
 
   private static void drawNotifications() {
     System.out.println(SET_TEXT_COLOR_GREEN + "Recent notifications:" + RESET_TEXT_COLOR);
@@ -40,7 +36,6 @@ public class ChessBoardMaker {
       System.out.println(SET_TEXT_COLOR_BLUE + "→ " + notification + RESET_TEXT_COLOR);
     }
   }
-
 
   public static void drawBoard(ChessBoard board, boolean blackPerspective) {
     drawBoard(board, blackPerspective, null);
