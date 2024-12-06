@@ -62,8 +62,8 @@ public class GameService {
     if (auth == null) {
       throw new UnauthorizedException("Error: unauthorized");
     }
-    if (playerColor == null){
-      throw new BadRequestException("Color is null");
+    if (playerColor == null) {
+      throw new BadRequestException("Error: bad request");
     }
 
     GameData game;
