@@ -1,3 +1,4 @@
+
 package server;
 
 import dataaccess.*;
@@ -8,6 +9,7 @@ import spark.Spark;
 public class Server {
     private final UserService userService;
     private final GameService gameService;
+    private final WebSocketHandler webSocketHandler;
 
     public Server() {
         try {
@@ -17,6 +19,7 @@ public class Server {
             var gameDAO = new SQLGameDAO();
             userService = new UserService(userDAO, authDAO);
             gameService = new GameService(userDAO, gameDAO, authDAO);
+            webSocketHandler = new WebSocketHandler(gameDAO, authDAO);
         } catch (DataAccessException e) {
             System.err.println("Failed to initialize server: " + e.getMessage());
             throw new RuntimeException(e);
@@ -27,6 +30,19 @@ public class Server {
         Spark.port(desiredPort);
         Spark.staticFiles.location("web");
 
+        configureWebSocket();
+        configureEndpoints();
+
+        Spark.awaitInitialization();
+        return Spark.port();
+    }
+
+    private void configureWebSocket() {
+        Spark.webSocket("/ws", webSocketHandler);
+    }
+
+    private void configureEndpoints() {
+        // CORS configuration
         Spark.options("/*", (request, response) -> {
             String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
             if (accessControlRequestHeaders != null) {
@@ -45,9 +61,6 @@ public class Server {
         Spark.get("/game", gameHandler::handleListGames);
         Spark.post("/game", gameHandler::handleCreateGame);
         Spark.put("/game", gameHandler::handleJoinGame);
-
-        Spark.awaitInitialization();
-        return Spark.port();
     }
 
     public void stop() {

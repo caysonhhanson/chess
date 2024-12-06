@@ -22,12 +22,13 @@ public class GameplayREPL {
     this.playerColor = playerColor;
 
     this.webSocket = new WebSocketDecoder(
-            "ws://" + server.getServerUrl() + "/connect",
+            "ws://" + server.getServerUrl() + "/ws",
             this::handleNotification,
             this::handleGameUpdate,
             this::handleError
     );
   }
+
 
   public void run() {
     try {
@@ -68,7 +69,10 @@ public class GameplayREPL {
   }
 
   private void handleNotification(String message) {
-    System.out.println("\nNOTIFICATION: " + message);
+    ChessBoardMaker.addNotification(message);
+    if (currentGame != null) {
+      redrawBoard();
+    }
   }
 
   private void handleError(String error) {
