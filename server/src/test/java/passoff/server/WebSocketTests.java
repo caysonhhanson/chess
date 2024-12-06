@@ -302,8 +302,9 @@ public class WebSocketTests {
                                Set<WebsocketUser> inGame, Set<WebsocketUser> otherClients) {
         TestCommand connectCommand = new TestCommand(UserGameCommand.CommandType.CONNECT, sender.authToken(), gameID);
         Map<String, Integer> numExpectedMessages = expectedMessages(sender, 1, inGame, (expectSuccess ? 1 : 0), otherClients);
+        System.out.println("Expecting messages: " + numExpectedMessages);
         Map<String, List<TestMessage>> actualMessages = environment.exchange(sender.username(), connectCommand, numExpectedMessages, waitTime);
-
+        System.out.println("Actual messages: " + actualMessages);
         assertCommandMessages(actualMessages, expectSuccess, sender, types(LOAD_GAME), inGame, types(NOTIFICATION), otherClients);
     }
 
