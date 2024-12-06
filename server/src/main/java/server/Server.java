@@ -38,8 +38,17 @@ public class Server {
     }
 
     private void configureWebSocket() {
-        Spark.webSocket("/ws", webSocketHandler);
+        System.out.println("🔧 [SERVER] Configuring WebSocket endpoint at /ws");
+        try {
+            Spark.webSocket("/ws", webSocketHandler);
+            System.out.println("✅ [SERVER] WebSocket configuration successful");
+        } catch (Exception e) {
+            System.err.println("❌ [SERVER] WebSocket configuration failed:");
+            e.printStackTrace();
+            throw new RuntimeException("Failed to configure WebSocket", e);
+        }
     }
+
 
     private void configureEndpoints() {
         // CORS configuration

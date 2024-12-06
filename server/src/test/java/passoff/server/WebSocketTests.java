@@ -1,6 +1,7 @@
 package passoff.server;
 
 import chess.*;
+import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
 import passoff.model.*;
 import passoff.websocket.*;
@@ -24,7 +25,7 @@ public class WebSocketTests {
     private WebsocketUser black;
     private WebsocketUser observer;
     private Integer gameID;
-
+    private static final Gson gson = TestFactory.getGsonBuilder().create();
     @AfterAll
     static void stopServer() {
         server.stop();
@@ -63,7 +64,42 @@ public class WebSocketTests {
     @Order(1)
     @DisplayName("Normal Connect")
     public void connectGood() {
-        setupNormalGame();
+        System.out.println("\n🔍 [TEST] Starting connectGood test");
+
+        try {
+            System.out.println("🔍 [TEST] Setting up normal game");
+            setupNormalGame();
+            System.out.println("🔍 [TEST] Completed setup");
+        } catch (Exception e) {
+            System.err.println("❌ [TEST] Error in test: ");
+            e.printStackTrace();
+        }
+    }
+
+    private void setupNormalGame() {
+        System.out.println("🔍 [TEST] Connecting white player");
+        connectToGame(white, gameID, true, Set.of(), Set.of());
+
+        System.out.println("🔍 [TEST] Connecting black player");
+        connectToGame(black, gameID, true, Set.of(white), Set.of());
+
+        System.out.println("🔍 [TEST] Connecting observer");
+        connectToGame(observer, gameID, true, Set.of(white, black), Set.of());
+    }
+
+    private void connectToGame(WebsocketUser sender, int gameID, boolean expectSuccess,
+                               Set<WebsocketUser> inGame, Set<WebsocketUser> otherClients) {
+        System.out.println("🔍 [TEST] Creating connect command for user: " + sender.username());
+        TestCommand connectCommand = new TestCommand(UserGameCommand.CommandType.CONNECT, sender.authToken(), gameID);
+        System.out.println("🔍 [TEST] Command created: " + gson.toJson(connectCommand));
+
+        Map<String, Integer> numExpectedMessages = expectedMessages(sender, 1, inGame, (expectSuccess ? 1 : 0), otherClients);
+        System.out.println("🔍 [TEST] Expected messages: " + numExpectedMessages);
+
+        Map<String, List<TestMessage>> actualMessages = environment.exchange(sender.username(), connectCommand, numExpectedMessages, waitTime);
+        System.out.println("🔍 [TEST] Actual messages received: " + actualMessages);
+
+        assertCommandMessages(actualMessages, expectSuccess, sender, types(LOAD_GAME), inGame, types(NOTIFICATION), otherClients);
     }
 
     @Test
@@ -269,12 +305,6 @@ public class WebSocketTests {
         leave(white, gameID, Set.of(black, observer), Set.of(white2, black2, observer2));
     }
 
-    private void setupNormalGame() {
-        connectToGame(white, gameID, true, Set.of(), Set.of()); //connect white player
-        connectToGame(black, gameID, true, Set.of(white), Set.of()); //connect black player
-        connectToGame(observer, gameID, true,  Set.of(white, black), Set.of()); //connect observer
-    }
-
     private WebsocketUser registerUser(String name, String password, String email) {
         TestAuthResult authResult = serverFacade.register(new TestUser(name, password, email));
         assertHttpOk(authResult, "registering a new user");
@@ -298,14 +328,6 @@ public class WebSocketTests {
                         context, serverFacade.getStatusCode(), result.getMessage()));
     }
 
-    private void connectToGame(WebsocketUser sender, int gameID, boolean expectSuccess,
-                               Set<WebsocketUser> inGame, Set<WebsocketUser> otherClients) {
-        TestCommand connectCommand = new TestCommand(UserGameCommand.CommandType.CONNECT, sender.authToken(), gameID);
-        Map<String, Integer> numExpectedMessages = expectedMessages(sender, 1, inGame, (expectSuccess ? 1 : 0), otherClients);
-        Map<String, List<TestMessage>> actualMessages = environment.exchange(sender.username(), connectCommand, numExpectedMessages, waitTime);
-
-        assertCommandMessages(actualMessages, expectSuccess, sender, types(LOAD_GAME), inGame, types(NOTIFICATION), otherClients);
-    }
 
     private void makeMove(WebsocketUser sender, int gameID, ChessMove move, boolean expectSuccess,
                           boolean extraNotification, Set<WebsocketUser> inGame, Set<WebsocketUser> otherClients) {
