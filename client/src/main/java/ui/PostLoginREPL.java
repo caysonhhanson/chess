@@ -1,11 +1,13 @@
 package ui;
 
 import client.ServerFacade;
+import model.GameData;
+
 import java.util.*;
 
 public class PostLoginREPL {
   private final ServerFacade facade;
-  private final List<model.GameData> gameCache;
+  private final List<GameData> gameCache;
   private boolean active;
 
   public PostLoginREPL(ServerFacade facade) {
@@ -21,10 +23,6 @@ public class PostLoginREPL {
       String[] args = scanner.nextLine().toLowerCase().split(" ");
       processCommand(args);
     }
-
-    // After logout, go back to PreLoginREPL
-    PreLoginREPL preLogin = new PreLoginREPL(facade);
-    preLogin.run();
   }
 
   private void processCommand(String[] args) {
@@ -75,7 +73,8 @@ public class PostLoginREPL {
       int gameId = getGameId(args[1]);
       if (facade.joinGame(gameId, args[2].toUpperCase())) {
         System.out.println("Joined game");
-        drawBoard();
+        GameplayREPL gameplayREPL = new GameplayREPL(facade, gameId, args[2].toUpperCase());
+        gameplayREPL.run();
       } else {
         System.out.println("Failed to join");
       }
@@ -93,7 +92,8 @@ public class PostLoginREPL {
       int gameId = getGameId(args[1]);
       if (facade.joinGame(gameId, null)) {
         System.out.println("Observing game");
-        drawBoard();
+        GameplayREPL gameplayREPL = new GameplayREPL(facade, gameId, null);
+        gameplayREPL.run();
       } else {
         System.out.println("Failed to observe");
       }
@@ -129,14 +129,5 @@ public class PostLoginREPL {
             help
             logout
             quit""");
-  }
-
-  private void drawBoard() {
-    var board = new chess.ChessBoard();
-    board.resetBoard();
-    System.out.println("\nBlack view:");
-    ChessBoardMaker.drawBoard(board, true);
-    System.out.println("\nWhite view:");
-    ChessBoardMaker.drawBoard(board, false);
   }
 }

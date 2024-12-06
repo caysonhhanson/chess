@@ -13,7 +13,7 @@ public class ServerFacade {
     this.http = new HTTPDecoder(this, serverDomain);
   }
 
-  protected String getAuthToken() {
+  public String getAuthToken() {
     return authToken;
   }
 
@@ -43,5 +43,9 @@ public class ServerFacade {
 
   public boolean joinGame(int gameId, String playerColor) {
     return http.joinGame(gameId, playerColor);
+  }
+
+  public String getServerUrl() {
+    return serverDomain;
   }
 }
