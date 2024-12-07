@@ -21,8 +21,9 @@ public class GameplayREPL {
     this.gameId = gameId;
     this.playerColor = playerColor;
 
+    // Initialize WebSocket with the proper URL format
     this.webSocket = new WebSocketDecoder(
-            "ws://" + server.getServerUrl() + "/ws",
+            server.getWebSocketUrl(),
             this::handleNotification,
             this::handleGameUpdate,
             this::handleError

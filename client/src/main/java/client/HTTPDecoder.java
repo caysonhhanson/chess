@@ -54,6 +54,8 @@ public class HTTPDecoder {
   public int createGame(String gameName) {
     var body = Map.of("gameName", gameName);
     Map resp = request("POST", "/game", gson.toJson(body));
+    System.out.println("gameName: " + gameName + resp + body);
+
     if (resp.containsKey("Error")) {
       return -1;
     }

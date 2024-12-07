@@ -9,17 +9,17 @@ import spark.Spark;
 public class Server {
     private final UserService userService;
     private final GameService gameService;
-    private final WebSocketHandler webSocketHandler;
+    public static GameDAO gameDAO;  // Make static so handler can access
+    public static AuthDAO authDAO;   // Make static so handler can access
 
     public Server() {
         try {
             DatabaseInitializer.initialize();
             var userDAO = new SQLUserDAO();
-            var authDAO = new SQLAuthDAO();
-            var gameDAO = new SQLGameDAO();
+            authDAO = new SQLAuthDAO();    // Assign to static field
+            gameDAO = new SQLGameDAO();    // Assign to static field
             userService = new UserService(userDAO, authDAO);
             gameService = new GameService(userDAO, gameDAO, authDAO);
-            webSocketHandler = new WebSocketHandler(gameDAO, authDAO);
         } catch (DataAccessException e) {
             System.err.println("Failed to initialize server: " + e.getMessage());
             throw new RuntimeException(e);
@@ -40,8 +40,8 @@ public class Server {
     private void configureWebSocket() {
         System.out.println("🔧 [SERVER] Configuring WebSocket endpoint at /ws");
         try {
-            Spark.webSocket("/ws", webSocketHandler);
-            System.out.println("✅ [SERVER] WebSocket configuration successful");
+            Spark.webSocket("/ws", WebSocketHandler.class);
+
         } catch (Exception e) {
             System.err.println("❌ [SERVER] WebSocket configuration failed:");
             e.printStackTrace();
@@ -49,9 +49,7 @@ public class Server {
         }
     }
 
-
     private void configureEndpoints() {
-        // CORS configuration
         Spark.options("/*", (request, response) -> {
             String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
             if (accessControlRequestHeaders != null) {

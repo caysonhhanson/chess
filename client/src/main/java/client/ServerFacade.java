@@ -7,10 +7,12 @@ public class ServerFacade {
   private final HTTPDecoder http;
   private String authToken;
   private final String serverDomain;
+  private final int port;
 
   public ServerFacade(int port) {
-    this.serverDomain = "localhost:" + port;
-    this.http = new HTTPDecoder(this, serverDomain);
+    this.port = port;
+    this.serverDomain = "localhost";
+    this.http = new HTTPDecoder(this, getServerUrl());
   }
 
   public String getAuthToken() {
@@ -46,6 +48,10 @@ public class ServerFacade {
   }
 
   public String getServerUrl() {
-    return serverDomain;
+    return serverDomain + ":" + port;
+  }
+
+  public String getWebSocketUrl() {
+    return "ws://" + getServerUrl() + "/ws";
   }
 }

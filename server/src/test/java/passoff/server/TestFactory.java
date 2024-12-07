@@ -15,7 +15,7 @@ public class TestFactory {
          * enough time to receive messages you send while debugging. Just make sure to decrease it when you
          * stop debugging and start running the tests again.
          */
-        return 10000L;
+        return 3000L;
     }
 
     public static GsonBuilder getGsonBuilder() {

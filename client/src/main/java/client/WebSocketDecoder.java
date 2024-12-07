@@ -1,7 +1,6 @@
 package client;
 
 import chess.ChessGame;
-import chess.ChessMove;
 import com.google.gson.*;
 import websocket.commands.*;
 import websocket.messages.*;
@@ -9,7 +8,6 @@ import websocket.messages.Error;
 
 import javax.websocket.*;
 import java.net.URI;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -23,6 +21,7 @@ public class WebSocketDecoder {
   private final Consumer<String> errorHandler;
   private final Gson gson;
   private final CountDownLatch connectLatch = new CountDownLatch(1);
+  private final CountDownLatch messageLatch = new CountDownLatch(1);
 
   public WebSocketDecoder(String serverUrl, Consumer<String> notificationHandler,
                           Consumer<ChessGame> gameUpdateHandler, Consumer<String> errorHandler) {
@@ -50,58 +49,70 @@ public class WebSocketDecoder {
   }
 
   public void connect() throws Exception {
-    System.out.println("🔌 [WS-CLIENT] Attempting to connect to: " + serverUrl);
+    System.out.println("\n🔍 [WS-DEBUG] Starting connection process...");
+    System.out.println("🔍 [WS-DEBUG] Server URL: " + serverUrl);
+
     WebSocketContainer container = ContainerProvider.getWebSocketContainer();
 
-    // Set container properties
-    container.setDefaultMaxTextMessageBufferSize(65535);
-    container.setDefaultMaxSessionIdleTimeout(10000);
+    // Set and log container properties
+    int bufferSize = 65535;
+    container.setDefaultMaxTextMessageBufferSize(bufferSize);
+    container.setDefaultMaxSessionIdleTimeout(0); // No timeout
+    System.out.println("🔍 [WS-DEBUG] Container configured:");
+    System.out.println("  - Buffer size: " + bufferSize);
+    System.out.println("  - Session timeout: 0 (disabled)");
 
-    // Connect with retries
+    // Connect with retries and detailed logging
     int maxRetries = 3;
     int attempt = 0;
     Exception lastException = null;
 
     while (attempt < maxRetries) {
-      try {
-        this.session = container.connectToServer(this, new URI(serverUrl));
-        System.out.println("🔌 [WS-CLIENT] Connection established");
+      attempt++;
+      System.out.println("\n🔍 [WS-DEBUG] Connection attempt " + attempt + " of " + maxRetries);
 
-        // Wait for connection to complete
+      try {
+        URI uri = new URI(serverUrl);
+        System.out.println("🔍 [WS-DEBUG] Parsed URI: " + uri);
+        System.out.println("  - Scheme: " + uri.getScheme());
+        System.out.println("  - Host: " + uri.getHost());
+        System.out.println("  - Port: " + uri.getPort());
+        System.out.println("  - Path: " + uri.getPath());
+
+        this.session = container.connectToServer(this, uri);
+        System.out.println("🔍 [WS-DEBUG] Initial connection established");
+        System.out.println("  - Session ID: " + (session != null ? session.getId() : "null"));
+        System.out.println("  - Session state: " + (session != null ? (session.isOpen() ? "open" : "closed") : "null"));
+
+        System.out.println("🔍 [WS-DEBUG] Waiting for onOpen confirmation...");
         if (connectLatch.await(5, TimeUnit.SECONDS)) {
-          System.out.println("✅ [WS-CLIENT] Connection confirmed");
+          System.out.println("✅ [WS-DEBUG] Connection fully established and confirmed");
+          System.out.println("  - Final session state: " + (session != null ? (session.isOpen() ? "open" : "closed") : "null"));
           return;
         } else {
-          System.out.println("⚠️ [WS-CLIENT] Connect latch timeout");
-          throw new Exception("Connection timeout");
+          System.out.println("❌ [WS-DEBUG] Connection timeout waiting for onOpen");
+          throw new Exception("Connection timeout - onOpen never called");
         }
+
       } catch (Exception e) {
         lastException = e;
-        attempt++;
-        System.out.println("⚠️ [WS-CLIENT] Connection attempt " + attempt + " failed: " + e.getMessage());
+        System.err.println("\n❌ [WS-DEBUG] Connection attempt " + attempt + " failed:");
+        System.err.println("  - Error type: " + e.getClass().getSimpleName());
+        System.err.println("  - Error message: " + e.getMessage());
+        e.printStackTrace();
+
         if (attempt < maxRetries) {
-          Thread.sleep(1000); // Wait before retry
+          int waitTime = 1000 * attempt; // Exponential backoff
+          System.out.println("⏳ [WS-DEBUG] Waiting " + waitTime + "ms before retry...");
+          Thread.sleep(waitTime);
         }
       }
     }
 
+    System.err.println("\n❌ [WS-DEBUG] All connection attempts failed");
     if (lastException != null) {
+      System.err.println("  - Final error: " + lastException.getMessage());
       throw lastException;
-    }
-  }
-
-  public void disconnect() {
-    System.out.println("🔌 [WS-CLIENT] Disconnecting...");
-    if (session != null && session.isOpen()) {
-      try {
-        session.close();
-        System.out.println("✅ [WS-CLIENT] Disconnected successfully");
-      } catch (Exception e) {
-        System.err.println("❌ [WS-CLIENT] Error during disconnect: " + e.getMessage());
-        errorHandler.accept("Error closing connection: " + e.getMessage());
-      }
-    } else {
-      System.out.println("ℹ️ [WS-CLIENT] No active session to disconnect");
     }
   }
 
@@ -112,22 +123,12 @@ public class WebSocketDecoder {
         String jsonCommand = gson.toJson(command);
         System.out.println("📤 [WS-CLIENT] Sending command JSON: " + jsonCommand);
 
-        // Use async send with completion callback
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        session.getAsyncRemote()
-                .sendText(jsonCommand, result -> {
-                  if (result.isOK()) {
-                    System.out.println("✅ [WS-CLIENT] Command sent successfully");
-                    future.complete(null);
-                  } else {
-                    String error = "Failed to send command: " + result.getException();
-                    System.err.println("❌ [WS-CLIENT] " + error);
-                    future.completeExceptionally(result.getException());
-                  }
-                });
+        // Use synchronous send for better reliability in test environment
+        session.getBasicRemote().sendText(jsonCommand);
+        System.out.println("✅ [WS-CLIENT] Command sent successfully");
 
-        // Wait for send completion
-        future.get(5, TimeUnit.SECONDS);
+        // Reset message latch for next message
+        messageLatch.countDown();
       } catch (Exception e) {
         System.err.println("❌ [WS-CLIENT] Error sending command: " + e.getMessage());
         e.printStackTrace();
@@ -144,6 +145,7 @@ public class WebSocketDecoder {
   public void onOpen(Session session) {
     System.out.println("🔌 [WS-CLIENT] WebSocket connection opened");
     System.out.println("ℹ️ [WS-CLIENT] Session ID: " + session.getId());
+    this.session = session;
     connectLatch.countDown();
   }
 
@@ -171,22 +173,36 @@ public class WebSocketDecoder {
           gameUpdateHandler.accept(game);
         }
       }
+      messageLatch.countDown();
     } catch (Exception e) {
-      System.err.println("❌ [WS-CLIENT] Error processing message: ");
+      System.err.println("❌ [WS-CLIENT] Error processing message: " + e.getMessage());
       e.printStackTrace();
       errorHandler.accept("Error processing message: " + e.getMessage());
     }
   }
 
+  public void disconnect() {
+    System.out.println("🔌 [WS-CLIENT] Disconnecting...");
+    if (session != null && session.isOpen()) {
+      try {
+        session.close();
+        System.out.println("✅ [WS-CLIENT] Disconnected successfully");
+      } catch (Exception e) {
+        System.err.println("❌ [WS-CLIENT] Error during disconnect: " + e.getMessage());
+        e.printStackTrace();
+      }
+    }
+  }
+
   @OnClose
   public void onClose(Session session, CloseReason reason) {
-    System.out.println("\n🔌 [WS-CLIENT] WebSocket connection closed");
-    System.out.println("ℹ️ [WS-CLIENT] Close reason: " + reason);
+    System.out.println("\n🔴 [WS-CLIENT] WebSocket connection closed");
+    System.out.println("🔴 [WS-CLIENT] Close reason: " + reason);
   }
 
   @OnError
   public void onError(Throwable error) {
-    System.err.println("\n❌ [WS-CLIENT] WebSocket error occurred: ");
+    System.err.println("\n❌ [WS-CLIENT] WebSocket error occurred: " + error.getMessage());
     error.printStackTrace();
     errorHandler.accept("WebSocket error: " + error.getMessage());
   }

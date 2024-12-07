@@ -2,7 +2,6 @@ package server;
 
 import chess.*;
 import com.google.gson.*;
-import dataaccess.*;
 import model.AuthData;
 import model.GameData;
 import org.eclipse.jetty.websocket.api.Session;
@@ -12,342 +11,330 @@ import websocket.commands.*;
 import websocket.messages.*;
 import websocket.messages.Error;
 
+import javax.websocket.OnOpen;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @WebSocket
 public class WebSocketHandler extends WebSocketAdapter {
   private static final Map<Integer, Map<Session, String>> gameConnections = new ConcurrentHashMap<>();
-  private final GameDAO gameDAO;
-  private final AuthDAO authDAO;
   private final Gson gson;
-  private static final Map<Session, String> pendingMessages = new ConcurrentHashMap<>();
 
-  public WebSocketHandler(GameDAO gameDAO, AuthDAO authDAO) {
-    System.out.println("🔵 [WEBSOCKET-INIT] Creating new WebSocketHandler instance");
-    this.gameDAO = gameDAO;
-    this.authDAO = authDAO;
-
+  public WebSocketHandler() {
     this.gson = new GsonBuilder()
             .registerTypeAdapter(UserGameCommand.class, (JsonDeserializer<UserGameCommand>) (json, typeOfT, context) -> {
               JsonObject obj = json.getAsJsonObject();
-              System.out.println("🔄 [WEBSOCKET-PARSE] Raw JSON: " + obj);
               String commandType = obj.get("commandType").getAsString();
-              System.out.println("🔄 [WEBSOCKET-PARSE] Command type: " + commandType);
+              String authToken = obj.get("authToken").getAsString();
+              Integer gameID = obj.get("gameID").getAsInt();
 
               return switch (commandType) {
-                case "MAKE_MOVE" -> {
-                  System.out.println("🔄 [WEBSOCKET-PARSE] Parsing MakeMove command");
-                  yield context.deserialize(json, MakeMove.class);
-                }
-                case "CONNECT" -> {
-                  if (obj.has("playerColor")) {
-                    System.out.println("🔄 [WEBSOCKET-PARSE] Parsing JoinPlayer command");
-                    yield context.deserialize(json, JoinPlayer.class);
-                  } else {
-                    System.out.println("🔄 [WEBSOCKET-PARSE] Parsing JoinObserver command");
-                    yield context.deserialize(json, JoinObserver.class);
-                  }
-                }
-                case "LEAVE" -> {
-                  System.out.println("🔄 [WEBSOCKET-PARSE] Parsing Leave command");
-                  yield context.deserialize(json, Leave.class);
-                }
-                case "RESIGN" -> {
-                  System.out.println("🔄 [WEBSOCKET-PARSE] Parsing Resign command");
-                  yield context.deserialize(json, Resign.class);
-                }
+                case "MAKE_MOVE" -> context.deserialize(json, MakeMove.class);
+                case "CONNECT" -> new UserGameCommand(UserGameCommand.CommandType.CONNECT, authToken, gameID);
+                case "LEAVE" -> new Leave(authToken, gameID);
+                case "RESIGN" -> new Resign(authToken, gameID);
                 default -> throw new JsonParseException("Unknown command type: " + commandType);
               };
-            })
-            .create();
-    System.out.println("🔵 [WEBSOCKET-INIT] Handler initialized");
+            }).create();
   }
+
+  @OnOpen
+  public void onOpen(Session session){
+    System.out.println("Connection opened" + session.getRemoteAddress().getHostName());
+  }
+
 
   @OnWebSocketConnect
   @Override
   public void onWebSocketConnect(Session session) {
-    System.out.println("\n🟢 [WEBSOCKET-CONNECT] New connection from " + session.getRemoteAddress());
+    System.out.println("\n🔌 [WS-HANDLER] New WebSocket connection from: " + session.getRemoteAddress());
     super.onWebSocketConnect(session);
-    session.setIdleTimeout(300000); // 5 minutes
-    System.out.println("🟢 [WEBSOCKET-CONNECT] Session initialized with ID: " + session.hashCode());
+    session.setIdleTimeout(300000);
+    System.out.println("🔌 [WS-HANDLER] Session initialized with ID: " + session.hashCode());
+
+    // Send initial LOAD_GAME message
+    LoadGame loadGame = new LoadGame(new ChessGame());
+    try {
+      String gameJson = gson.toJson(loadGame);
+      session.getRemote().sendString(gameJson);
+      System.out.println("✅ [WS-HANDLER] Sent initial LOAD_GAME message");
+    } catch (Exception e) {
+      System.err.println("❌ [WS-HANDLER] Failed to send initial game state: " + e.getMessage());
+    }
   }
 
   @OnWebSocketMessage
   public void onWebSocketMessage(Session session, String message) {
-    System.out.println("\n📥 [WEBSOCKET-MESSAGE] Received from session " + session.hashCode() + ": " + message);
-
+    System.out.println("\n📥 [WS-MESSAGE] Received message: " + message);
     try {
       UserGameCommand command = gson.fromJson(message, UserGameCommand.class);
-      System.out.println("📦 [WEBSOCKET-MESSAGE] Parsed command type: " + command.getCommandType());
 
-      // Store the message in case we need to retry
-      pendingMessages.put(session, message);
+      if (command.getCommandType() == UserGameCommand.CommandType.CONNECT) {
+        // Store connection in game connections map
+        Map<Session, String> gameSessions = gameConnections.computeIfAbsent(
+                command.getGameID(),
+                k -> new ConcurrentHashMap<>()
+        );
+        gameSessions.put(session, command.getAuthToken());
+        System.out.println("✅ [WS-MESSAGE] Added connection to game " + command.getGameID());
 
-      AuthData auth = authDAO.getAuth(command.getAuthToken());
-      System.out.println("🔑 [WEBSOCKET-AUTH] Auth token check: " + (auth != null ? "valid" : "invalid"));
+        // Send LOAD_GAME to the connecting player
+        LoadGame loadGame = new LoadGame(new ChessGame());
+        String loadGameJson = gson.toJson(loadGame);
+        session.getRemote().sendString(loadGameJson);
 
-      if (auth == null) {
-        System.out.println("❌ [WEBSOCKET-AUTH] Invalid auth token");
-        sendError(session, "Error: unauthorized");
-        return;
+        // Send notification to other players
+        if (gameSessions.size() > 1) {
+          Notification notification = new Notification("A player has connected");
+          String notificationJson = gson.toJson(notification);
+
+          for (Session existingSession : gameSessions.keySet()) {
+            if (existingSession != session && existingSession.isOpen()) {
+              try {
+                existingSession.getRemote().sendString(notificationJson);
+                System.out.println("✅ [WS-MESSAGE] Sent notification to session " + existingSession.hashCode());
+              } catch (Exception e) {
+                System.err.println("❌ [WS-MESSAGE] Failed to send notification: " + e.getMessage());
+              }
+            }
+          }
+        }
       }
-
-      GameData game = gameDAO.getGame(command.getGameID());
-      System.out.println("🎮 [WEBSOCKET-GAME] Game lookup: " + (game != null ? "found" : "not found"));
-
-      if (game == null) {
-        System.out.println("❌ [WEBSOCKET-GAME] Game not found");
-        sendError(session, "Error: game not found");
-        return;
-      }
-
-      processCommand(session, command, auth, game);
-
-      // Clear the pending message after successful processing
-      pendingMessages.remove(session);
-
     } catch (Exception e) {
-      System.err.println("❌ [WEBSOCKET-ERROR] Error processing message:");
+      System.err.println("❌ [WS-MESSAGE] Error processing message: " + e.getMessage());
       e.printStackTrace();
       sendError(session, "Error: " + e.getMessage());
     }
   }
 
-  private void processCommand(Session session, UserGameCommand command, AuthData auth, GameData game) {
-    try {
-      System.out.println("🔄 [WEBSOCKET-PROCESS] Processing command: " + command.getCommandType());
-
-      switch (command.getCommandType()) {
-        case CONNECT -> {
-          System.out.println("🔄 [WEBSOCKET-PROCESS] Handling connect");
-          handleConnect(session, command, auth, game);
-        }
-        case MAKE_MOVE -> {
-          System.out.println("🔄 [WEBSOCKET-PROCESS] Handling move");
-          handleMove(session, command, auth, game);
-        }
-        case RESIGN -> {
-          System.out.println("🔄 [WEBSOCKET-PROCESS] Handling resign");
-          handleResign(session, command, auth, game);
-        }
-        case LEAVE -> {
-          System.out.println("🔄 [WEBSOCKET-PROCESS] Handling leave");
-          handleLeave(session, command);
-        }
-      }
-    } catch (Exception e) {
-      System.err.println("❌ [WEBSOCKET-PROCESS] Error processing command: " + e.getMessage());
-      e.printStackTrace();
-    }
-  }
-
   private void handleConnect(Session session, UserGameCommand command, AuthData auth, GameData game) {
     try {
-      System.out.println("\n🔄 [WEBSOCKET-CONNECT] Processing connect for user: " + auth.username());
+      System.out.println("\n🔄 [CONNECT] Starting connection for user: " + auth.username());
+      System.out.println("🔄 [CONNECT] Game ID: " + command.getGameID());
+      System.out.println("🔄 [CONNECT] Game state: " + (game != null ? "found" : "null"));
 
-      // Add to connections
-      Map<Session, String> gameSessionMap = gameConnections.computeIfAbsent(command.getGameID(), k -> new ConcurrentHashMap<>());
-      gameSessionMap.put(session, auth.username());
-      System.out.println("✅ [WEBSOCKET-CONNECT] Added to game connections. Total connections: " + gameSessionMap.size());
+      Map<Session, String> gameSessions = gameConnections.computeIfAbsent(
+              command.getGameID(),
+              k -> new ConcurrentHashMap<>()
+      );
+      gameSessions.put(session, auth.username());
+      System.out.println("✅ [CONNECT] Added to game connections. Current players in game: " + gameSessions.size());
 
-      // Send game state
+
       LoadGame loadGameMessage = new LoadGame(game.game());
       String loadGameJson = gson.toJson(loadGameMessage);
-      System.out.println("📤 [WEBSOCKET-CONNECT] Sending game state: " + loadGameJson);
-      session.getRemote().sendString(loadGameJson);
+      System.out.println("📤 [CONNECT] Sending LOAD_GAME message: " + loadGameJson);
 
-      // Send join notification
-      String notificationMessage;
-      if (command instanceof JoinPlayer joinPlayer) {
-        String color = joinPlayer.getPlayerColor();
-        System.out.println("👤 [WEBSOCKET-CONNECT] Joining as " + color + " player");
-        notificationMessage = String.format("%s joined as %s player", auth.username(), color);
-      } else {
-        System.out.println("👀 [WEBSOCKET-CONNECT] Joining as observer");
-        notificationMessage = String.format("%s joined as an observer", auth.username());
+      try {
+        session.getRemote().sendString(loadGameJson);
+        System.out.println("✅ [CONNECT] LOAD_GAME message sent successfully");
+      } catch (Exception e) {
+        System.err.println("❌ [CONNECT] Failed to send LOAD_GAME message: " + e.getMessage());
+        e.printStackTrace();
+        throw e;
       }
 
-      System.out.println("📢 [WEBSOCKET-CONNECT] Broadcasting notification: " + notificationMessage);
-      broadcastNotification(command.getGameID(), notificationMessage, session);
+      // Determine player type and create notification
+      String notificationMessage;
+      if (auth.username().equals(game.whiteUsername())) {
+        notificationMessage = String.format("%s joined as WHITE player", auth.username());
+        System.out.println("👤 [CONNECT] User is WHITE player");
+      } else if (auth.username().equals(game.blackUsername())) {
+        notificationMessage = String.format("%s joined as BLACK player", auth.username());
+        System.out.println("👤 [CONNECT] User is BLACK player");
+      } else {
+        notificationMessage = String.format("%s joined as an observer", auth.username());
+        System.out.println("👀 [CONNECT] User is OBSERVER");
+      }
+
+      // Broadcast notification
+      System.out.println("📢 [CONNECT] Broadcasting notification: " + notificationMessage);
+      try {
+        broadcastNotification(command.getGameID(), notificationMessage, session);
+        System.out.println("✅ [CONNECT] Notification broadcast complete");
+      } catch (Exception e) {
+        System.err.println("❌ [CONNECT] Failed to broadcast notification: " + e.getMessage());
+        e.printStackTrace();
+        throw e;
+      }
+
+      System.out.println("✅ [CONNECT] Connection handling completed successfully\n");
 
     } catch (Exception e) {
-      System.err.println("❌ [WEBSOCKET-CONNECT] Error in connect handler: " + e.getMessage());
+      System.err.println("❌ [CONNECT] Error during connect: " + e.getMessage());
       e.printStackTrace();
       sendError(session, "Error during connect: " + e.getMessage());
     }
   }
 
-  // ... [rest of the handlers remain the same but with added logging]
-
-  private void cleanupSession(Session session) {
-    gameConnections.values().forEach(sessions -> {
-      String username = sessions.remove(session);
-      if (username != null) {
-        System.out.println("🧹 [WEBSOCKET-CLEANUP] Removed user: " + username);
-        broadcast(sessions, gson.toJson(new Notification(username + " disconnected")));
-      }
-    });
-  }
-
-  private void handleMove(Session session, UserGameCommand command, AuthData auth, GameData game) throws Exception {
-    System.out.println("🔄 [WEBSOCKET-MOVE] Processing move for user: " + auth.username());
-
+  private void handleMove(Session session, UserGameCommand command, AuthData auth, GameData game) {
     if (!(command instanceof MakeMove moveCommand)) {
-      System.out.println("❌ [WEBSOCKET-MOVE] Invalid move command type");
       sendError(session, "Error: invalid move command");
       return;
     }
 
-    ChessMove move = moveCommand.getMove();
     ChessGame chessGame = game.game();
 
-    // Validate player and turn
-    boolean isWhite = game.whiteUsername() != null && game.whiteUsername().equals(auth.username());
-    boolean isBlack = game.blackUsername() != null && game.blackUsername().equals(auth.username());
+    // Validate player's turn
+    boolean isWhite = auth.username().equals(game.whiteUsername());
+    boolean isBlack = auth.username().equals(game.blackUsername());
 
     if (!isWhite && !isBlack) {
-      System.out.println("❌ [WEBSOCKET-MOVE] Not a player in the game");
       sendError(session, "Error: not a player in the game");
       return;
     }
 
     if ((chessGame.getTeamTurn() == ChessGame.TeamColor.WHITE && !isWhite) ||
             (chessGame.getTeamTurn() == ChessGame.TeamColor.BLACK && !isBlack)) {
-      System.out.println("❌ [WEBSOCKET-MOVE] Not player's turn");
       sendError(session, "Error: not your turn");
       return;
     }
 
     try {
-      // Execute move
-      chessGame.makeMove(move);
-      gameDAO.updateGame(game);
-      System.out.println("✅ [WEBSOCKET-MOVE] Move successful");
+      // Make the move
+      chessGame.makeMove(moveCommand.getMove());
+      Server.gameDAO.updateGame(game);
 
-      // Broadcast updated game state
+      // Broadcast updated game state to all players
       LoadGame loadGame = new LoadGame(chessGame);
-      String loadGameJson = gson.toJson(loadGame);
-      System.out.println("📤 [WEBSOCKET-MOVE] Broadcasting game state");
-      broadcast(gameConnections.get(command.getGameID()), loadGameJson);
+      broadcast(gameConnections.get(command.getGameID()), gson.toJson(loadGame));
 
-      // Broadcast move notification
+      // Send move notification
       String moveNotification = String.format("%s moved from %s to %s",
-              auth.username(), move.getStartPosition(), move.getEndPosition());
-      System.out.println("📢 [WEBSOCKET-MOVE] Broadcasting: " + moveNotification);
+              auth.username(),
+              moveCommand.getMove().getStartPosition(),
+              moveCommand.getMove().getEndPosition());
       broadcastNotification(command.getGameID(), moveNotification, null);
 
-      // Check game state
+      // Check for checkmate or check
       ChessGame.TeamColor currentTeam = chessGame.getTeamTurn();
       if (chessGame.isInCheckmate(currentTeam)) {
+        ChessGame.TeamColor winner = (currentTeam == ChessGame.TeamColor.WHITE) ?
+                ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE;
         broadcastNotification(command.getGameID(),
-                String.format("Checkmate! %s wins!", currentTeam == ChessGame.TeamColor.WHITE ? "Black" : "White"),
+                String.format("Checkmate! %s wins!", winner),
                 null);
       } else if (chessGame.isInCheck(currentTeam)) {
-        broadcastNotification(command.getGameID(), currentTeam + " is in check!", null);
+        broadcastNotification(command.getGameID(),
+                String.format("%s is in check!", currentTeam),
+                null);
       }
     } catch (InvalidMoveException e) {
-      System.out.println("❌ [WEBSOCKET-MOVE] Invalid move: " + e.getMessage());
       sendError(session, "Error: invalid move");
+    } catch (Exception e) {
+      sendError(session, "Error: " + e.getMessage());
     }
   }
 
-  private void handleResign(Session session, UserGameCommand command, AuthData auth, GameData game) throws Exception {
-    System.out.println("🔄 [WEBSOCKET-RESIGN] Processing resign for user: " + auth.username());
-
+  private void handleResign(Session session, UserGameCommand command, AuthData auth, GameData game) {
     if (!auth.username().equals(game.whiteUsername()) && !auth.username().equals(game.blackUsername())) {
-      System.out.println("❌ [WEBSOCKET-RESIGN] Not a player in the game");
       sendError(session, "Error: only players can resign");
       return;
     }
 
-    System.out.println("📢 [WEBSOCKET-RESIGN] Broadcasting resignation");
-    broadcastNotification(command.getGameID(), auth.username() + " resigned from the game", null);
+    broadcastNotification(command.getGameID(),
+            String.format("%s resigned from the game", auth.username()),
+            null);
   }
 
-  private void handleLeave(Session session, UserGameCommand command) {
-    System.out.println("🔄 [WEBSOCKET-LEAVE] Processing leave command");
+  private void handleLeave(Session session, UserGameCommand command, AuthData auth) {
     Map<Session, String> gameSessions = gameConnections.get(command.getGameID());
     if (gameSessions != null) {
-      String username = gameSessions.remove(session);
-      if (username != null) {
-        System.out.println("📢 [WEBSOCKET-LEAVE] Broadcasting departure");
-        broadcastNotification(command.getGameID(), username + " left the game", session);
-      }
+      gameSessions.remove(session);
+      broadcastNotification(command.getGameID(),
+              String.format("%s left the game", auth.username()),
+              session);
+    }
+  }
+
+  private void sendMessage(Session session, ServerMessage message) {
+    try {
+      String gameJson = gson.toJson(message);
+      System.out.println(gameJson);
+      session.getRemote().sendString(gameJson);
+      System.out.println("Game Sent");
+    } catch (Exception e) {
+      System.err.println("Failed  to send Game" + e.getMessage());
+      e.printStackTrace();
     }
   }
 
   private void sendError(Session session, String message) {
     try {
-      System.out.println("❌ [WEBSOCKET-ERROR] Sending error: " + message);
       Error error = new Error(message);
       String errorJson = gson.toJson(error);
+      System.out.println("📤 [ERROR] Sending error message: " + errorJson);
       session.getRemote().sendString(errorJson);
+      System.out.println("✅ [ERROR] Error message sent");
     } catch (Exception e) {
-      System.err.println("❌ [WEBSOCKET-ERROR] Failed to send error: " + e.getMessage());
+      System.err.println("❌ [ERROR] Failed to send error message: " + e.getMessage());
+      e.printStackTrace();
     }
   }
 
   private void broadcastNotification(int gameId, String message, Session exclude) {
-    System.out.println("📢 [WEBSOCKET-BROADCAST] Notification to game " + gameId + ": " + message);
-    Notification notification = new Notification(message);
-    String jsonNotification = gson.toJson(notification);
+    try {
+      Map<Session, String> sessions = gameConnections.get(gameId);
+      if (sessions == null) {
+        System.out.println("ℹ️ [BROADCAST] No sessions found for game " + gameId);
+        return;
+      }
 
-    Map<Session, String> sessions = gameConnections.get(gameId);
-    if (sessions != null) {
+      Notification notification = new Notification(message);
+      String notificationJson = gson.toJson(notification);
+      System.out.println("📢 [BROADCAST] Broadcasting to " + (sessions.size() - 1) + " other sessions: " + notificationJson);
+
       for (Session session : sessions.keySet()) {
-        if (session != exclude) {
+        if (session != exclude && session.isOpen()) {
           try {
-            session.getRemote().sendString(jsonNotification);
-            System.out.println("📤 [WEBSOCKET-BROADCAST] Sent to session: " + session.getRemoteAddress());
+            session.getRemote().sendString(notificationJson);
+            System.out.println("✅ [BROADCAST] Sent to session: " + session.hashCode());
           } catch (Exception e) {
-            System.err.println("❌ [WEBSOCKET-BROADCAST] Failed to send to session: " + e.getMessage());
+            System.err.println("❌ [BROADCAST] Failed to send to session " + session.hashCode() + ": " + e.getMessage());
           }
         }
       }
+    } catch (Exception e) {
+      System.err.println("❌ [BROADCAST] Error during broadcast: " + e.getMessage());
+      e.printStackTrace();
     }
   }
 
   private void broadcast(Map<Session, String> sessions, String message) {
-    System.out.println("📢 [WEBSOCKET-BROADCAST] Broadcasting message to all sessions");
     if (sessions != null) {
       for (Session session : sessions.keySet()) {
         try {
-          session.getRemote().sendString(message);
-          System.out.println("📤 [WEBSOCKET-BROADCAST] Sent to session: " + session.getRemoteAddress());
+          if (session.isOpen()) {
+            session.getRemote().sendString(message);
+          }
         } catch (Exception e) {
-          System.err.println("❌ [WEBSOCKET-BROADCAST] Failed to send: " + e.getMessage());
+          System.err.println("❌ [WS-BROADCAST] Failed to broadcast: " + e.getMessage());
         }
       }
     }
   }
 
   @OnWebSocketClose
-  @Override
   public void onWebSocketClose(int statusCode, String reason) {
     Session session = getSession();
-    System.out.println("\n🔴 [WEBSOCKET-CLOSE] Connection closing for session " +
-            (session != null ? session.hashCode() : "null"));
-    System.out.println("🔴 [WEBSOCKET-CLOSE] Status: " + statusCode + ", Reason: " + reason);
+    System.out.println("\n🔴 [WS-CLOSE] Connection closing for session " + session.hashCode());
+    System.out.println("🔴 [WS-CLOSE] Status: " + statusCode + ", Reason: " + reason);
 
     if (session != null) {
-      // Check if there was a pending message that wasn't processed
-      String pendingMessage = pendingMessages.remove(session);
-      if (pendingMessage != null) {
-        System.out.println("⚠️ [WEBSOCKET-CLOSE] Found unprocessed message: " + pendingMessage);
-      }
-
-      // Clean up connections
-      cleanupSession(session);
+      // Clean up all game connections for this session
+      gameConnections.values().forEach(sessions -> {
+        String username = sessions.remove(session);
+        if (username != null) {
+          broadcast(sessions, gson.toJson(new Notification(username + " disconnected")));
+        }
+      });
     }
     super.onWebSocketClose(statusCode, reason);
   }
 
   @OnWebSocketError
-  @Override
   public void onWebSocketError(Throwable cause) {
-    System.err.println("⛔ [WEBSOCKET-ERROR] Error occurred:");
+    System.err.println("\n❌ [WS-ERROR] WebSocket error occurred:");
     cause.printStackTrace();
-    super.onWebSocketError(cause);
   }
 }
