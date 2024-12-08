@@ -41,13 +41,15 @@ public class Server {
         System.out.println("🔧 [SERVER] Configuring WebSocket endpoint at /ws");
         try {
             Spark.webSocket("/ws", WebSocketHandler.class);
-
+            System.out.println("✅ [SERVER] WebSocket endpoint configured successfully");
+            System.out.println("📝 [SERVER] Handler class: " + WebSocketHandler.class.getName());
         } catch (Exception e) {
             System.err.println("❌ [SERVER] WebSocket configuration failed:");
             e.printStackTrace();
             throw new RuntimeException("Failed to configure WebSocket", e);
         }
     }
+
 
     private void configureEndpoints() {
         Spark.options("/*", (request, response) -> {
