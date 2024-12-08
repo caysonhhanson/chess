@@ -44,7 +44,6 @@ public class WebSocketHandler extends WebSocketAdapter {
       UserGameCommand command = gson.fromJson(message, UserGameCommand.class);
       System.out.println("🔄 [WS-MESSAGE] Parsed command type: " + command.getCommandType());
 
-      // Validate auth token
       AuthData auth = Server.authDAO.getAuth(command.getAuthToken());
       if (auth == null) {
         System.out.println("❌ [WS-MESSAGE] Invalid auth token");
@@ -52,7 +51,6 @@ public class WebSocketHandler extends WebSocketAdapter {
         return;
       }
 
-      // Get game data
       GameData game = null;
       try {
         game = Server.gameDAO.getGame(command.getGameID());
@@ -174,7 +172,6 @@ public class WebSocketHandler extends WebSocketAdapter {
 
     ChessGame chessGame = game.game();
 
-    // Validate player's turn
     boolean isWhite = auth.username().equals(game.whiteUsername());
     boolean isBlack = auth.username().equals(game.blackUsername());
 
@@ -190,13 +187,11 @@ public class WebSocketHandler extends WebSocketAdapter {
     }
 
     try {
-      // Make the move
       chessGame.makeMove(moveCommand.getMove());
       Server.gameDAO.updateGame(game);
 
       Map<Session, String> gameSessions = gameConnections.get(command.getGameID());
       if (gameSessions != null) {
-        // Create messages once
         LoadGame loadGame = new LoadGame(chessGame);
         String loadGameJson = gson.toJson(loadGame);
 
@@ -207,15 +202,27 @@ public class WebSocketHandler extends WebSocketAdapter {
         Notification notification = new Notification(moveNotification);
         String notificationJson = gson.toJson(notification);
 
-        // Send to each session
-        for (Session clientSession : gameSessions.keySet()) {
+        for (Map.Entry<Session, String> entry : gameSessions.entrySet()) {
+          Session clientSession = entry.getKey();
+          String username = entry.getValue();
+
           if (clientSession.isOpen()) {
-            // Send updated game state to everyone
+            // Always send game state update
             clientSession.getRemote().sendString(loadGameJson);
 
-            // Only send notification to other players/observers
-            if (!clientSession.equals(session)) {
-              clientSession.getRemote().sendString(notificationJson);
+            // Send notification based on team and observer status
+            if (isWhite) {
+              // If white moved, send to black player and observers
+              if (username.equals(game.blackUsername()) ||
+                      (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
+                clientSession.getRemote().sendString(notificationJson);
+              }
+            } else {
+              // If black moved, send to white player and observers
+              if (username.equals(game.whiteUsername()) ||
+                      (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
+                clientSession.getRemote().sendString(notificationJson);
+              }
             }
           }
         }

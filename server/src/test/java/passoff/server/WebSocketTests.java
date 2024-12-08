@@ -124,7 +124,6 @@ public class WebSocketTests {
     public void validMove() {
         setupNormalGame();
 
-        //make a valid pawn move
         ChessMove move = new ChessMove(new ChessPosition(2, 5), new ChessPosition(3, 5), null);
         makeMove(white, gameID, move,true, false, Set.of(black, observer), Set.of());
     }
