@@ -23,7 +23,8 @@ public class ChessGame {
 
     public enum TeamColor {
         WHITE,
-        BLACK
+        BLACK,
+        RESIGNED
     }
 
     public Collection<ChessMove> validMoves(ChessPosition startPosition) {
@@ -132,6 +133,12 @@ public class ChessGame {
             }
         }
         return false;
+    }
+
+    public void isResigned(){
+
+
+
     }
 
     public boolean isInCheckmate(TeamColor teamColor) {

@@ -2,19 +2,29 @@ package server;
 
 import chess.*;
 import com.google.gson.*;
+import dataaccess.DataAccessException;
 import model.AuthData;
 import model.GameData;
+import org.eclipse.jetty.websocket.api.RemoteEndpoint;
+import org.eclipse.jetty.websocket.api.annotations.WebSocket;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
+//import org.eclipse.jetty.websocket.api.RemoteEndpoint;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
+
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketAdapter;
 import org.eclipse.jetty.websocket.api.annotations.*;
 import websocket.commands.*;
 import websocket.messages.*;
 import websocket.messages.Error;
+
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @WebSocket
-public class WebSocketHandler extends WebSocketAdapter {
+public class WebSocketHandler{
   private static final Map<Integer, Map<Session, String>> gameConnections = new ConcurrentHashMap<>();
   private final Gson gson;
 
@@ -37,8 +47,8 @@ public class WebSocketHandler extends WebSocketAdapter {
   }
 
 
-  @Override
-  public void onWebSocketText(String message) {
+  @OnWebSocketMessage
+  public void onMessage(Session session, String message) {
     System.out.println("\n⚡ [DEBUG] onWebSocketText triggered with message: " + message);
     try {
       UserGameCommand command = gson.fromJson(message, UserGameCommand.class);
@@ -46,8 +56,9 @@ public class WebSocketHandler extends WebSocketAdapter {
 
       AuthData auth = Server.authDAO.getAuth(command.getAuthToken());
       if (auth == null) {
-        System.out.println("❌ [WS-MESSAGE] Invalid auth token");
-        sendError(getSession(), "Error: unauthorized");
+        System.out.println("❌ [WS-MESSAGE] Invalid auth token: " + command.getAuthToken().toString());
+
+        sendError(session, "Error: unauthorized");
         return;
       }
 
@@ -56,50 +67,54 @@ public class WebSocketHandler extends WebSocketAdapter {
         game = Server.gameDAO.getGame(command.getGameID());
         if (game == null) {
           System.out.println("❌ [WS-MESSAGE] Game not found: " + command.getGameID());
-          sendError(getSession(), "Error: game not found");
+          sendError(session, "Error: game not found");
           return;
         }
       } catch (Exception e) {
         System.out.println("❌ [WS-MESSAGE] Error retrieving game: " + e.getMessage());
-        sendError(getSession(), "Error: game not found");
+        sendError(session, "Error: game not found");
         return;
       }
 
       switch (command.getCommandType()) {
         case CONNECT -> {
           System.out.println("🔄 [WS-MESSAGE] Processing CONNECT command");
-          handleConnect(getSession(), command, auth, game);
+          handleConnect(session, command, auth, game);
         }
         case MAKE_MOVE -> {
           System.out.println("🔄 [WS-MESSAGE] Processing MAKE_MOVE command");
-          handleMove(getSession(), command, auth, game);
+          handleMove(session, command, auth, game);
         }
         case RESIGN -> {
           System.out.println("🔄 [WS-MESSAGE] Processing RESIGN command");
-          handleResign(getSession(), command, auth, game);
+          handleResign(session, command, auth, game);
         }
         case LEAVE -> {
           System.out.println("🔄 [WS-MESSAGE] Processing LEAVE command");
-          handleLeave(getSession(), command, auth);
+          handleLeave(session, command, auth);
         }
         default -> {
           System.out.println("❌ [WS-MESSAGE] Unknown command type: " + command.getCommandType());
-          sendError(getSession(), "Error: unknown command type");
+          sendError(session, "Error: unknown command type");
         }
       }
     } catch (Exception e) {
       System.err.println("❌ [WS-MESSAGE] Error processing message: ");
       e.printStackTrace();
-      sendError(getSession(), "Error: " + e.getMessage());
+      sendError(session, "Error: " + e.getMessage());
     }
   }
 
   @OnWebSocketConnect
-  @Override
   public void onWebSocketConnect(Session session) {
     System.out.println("\n⚡ [DEBUG] onWebSocketConnect triggered");
     System.out.println("\n🔌 [WS-HANDLER] New WebSocket connection from: " + session.getRemoteAddress());
-    super.onWebSocketConnect(session);
+
+    RemoteEndpoint remote = session.getRemote();
+
+    //this.session = sess;
+    //this.remote = sess.getRemote();
+    //super.onWebSocketConnect(session);
     System.out.println("🔌 [WS-HANDLER] Session initialized with ID: " + session.hashCode());
   }
 
@@ -179,13 +194,20 @@ public class WebSocketHandler extends WebSocketAdapter {
       sendError(session, "Error: not a player in the game");
       return;
     }
-
-    if ((chessGame.getTeamTurn() == ChessGame.TeamColor.WHITE && !isWhite) ||
-            (chessGame.getTeamTurn() == ChessGame.TeamColor.BLACK && !isBlack)) {
+    System.out.println("Team turn is: " + game.game().getTeamTurn().toString());
+    if ((chessGame.getTeamTurn() == ChessGame.TeamColor.RESIGNED)){
+      System.out.println("Game is over");
+      sendError(session, "Game is Over");
+      return;
+    }
+    if ((chessGame.getTeamTurn() != ChessGame.TeamColor.WHITE && isWhite) || (chessGame.getTeamTurn() != ChessGame.TeamColor.BLACK && isBlack)) {
       sendError(session, "Error: not your turn");
       return;
     }
-
+    if (chessGame.isInCheckmate(ChessGame.TeamColor.WHITE) || chessGame.isInCheckmate(ChessGame.TeamColor.BLACK)){
+      sendError(session, "No moves to be made.");
+      return;
+    }
     try {
       chessGame.makeMove(moveCommand.getMove());
       Server.gameDAO.updateGame(game);
@@ -248,17 +270,36 @@ public class WebSocketHandler extends WebSocketAdapter {
     }
   }
 
-
   private void handleResign(Session session, UserGameCommand command, AuthData auth, GameData game) {
     if (!auth.username().equals(game.whiteUsername()) && !auth.username().equals(game.blackUsername())) {
       sendError(session, "Error: only players can resign");
       return;
     }
 
+    game.game().setTeamTurn(ChessGame.TeamColor.RESIGNED);
+    System.out.println("Team turn: " + game.game().getTeamTurn().toString());
     broadcastNotification(command.getGameID(),
-            String.format("%s resigned from the game", auth.username()),
-            null);
+            String.format("%s resigned from the game", auth.username()), null);
+
+
+    try {
+      Server.gameDAO.updateGame(game);
+    } catch (DataAccessException e) {
+      throw new RuntimeException(e);
+    }
+
+    //System.out.println("📤 [CONNECT] Sending LOAD_GAME message: " + loadGameJson);
+//    try {
+//      session.getRemote().sendString(loadGameJson);
+//    } catch (IOException e) {
+//      System.err.println("❌ [CONNECT] Failed to send LOAD_GAME message: ");
+//      throw new RuntimeException(e);
+//    }
+    //System.out.println("✅ [CONNECT] LOAD_GAME message sent successfully");
+
   }
+
+
 
   private void handleLeave(Session session, UserGameCommand command, AuthData auth) {
     Map<Session, String> gameSessions = gameConnections.get(command.getGameID());
@@ -273,12 +314,16 @@ public class WebSocketHandler extends WebSocketAdapter {
 
   private void sendError(Session session, String message) {
     try {
+      System.out.println("session for sending error: " + session.hashCode());
+      System.out.println("session get remote: " + session.getRemote().hashCode());
       Error error = new Error(message);
+
       session.getRemote().sendString(gson.toJson(error));
     } catch (Exception e) {
       System.err.println("❌ [WS-ERROR] Failed to send error: " + e.getMessage());
     }
   }
+
 
   private void broadcastNotification(int gameId, String message, Session exclude) {
     try {
@@ -316,9 +361,9 @@ public class WebSocketHandler extends WebSocketAdapter {
   }
 
   @OnWebSocketClose
-  public void onWebSocketClose(int statusCode, String reason) {
+  public void onWebSocketClose(Session session, int statusCode, String reason) {
     System.out.println("\n⚡ [DEBUG] onWebSocketClose triggered");
-    Session session = getSession();
+    //Session session = getSession();
     System.out.println("\n🔴 [WS-CLOSE] Connection closing for session " + session.hashCode());
     System.out.println("🔴 [WS-CLOSE] Status: " + statusCode + ", Reason: " + reason);
 
@@ -331,7 +376,9 @@ public class WebSocketHandler extends WebSocketAdapter {
         }
       });
     }
-    super.onWebSocketClose(statusCode, reason);
+    //session = null;
+    // this.remote = null;
+    //super.onWebSocketClose(statusCode, reason);
   }
 
   @OnWebSocketError
