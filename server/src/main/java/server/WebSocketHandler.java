@@ -91,7 +91,7 @@ public class WebSocketHandler{
         }
         case LEAVE -> {
           System.out.println("🔄 [WS-MESSAGE] Processing LEAVE command");
-          handleLeave(session, command, auth);
+          handleLeave(session, command, auth, game);
         }
         default -> {
           System.out.println("❌ [WS-MESSAGE] Unknown command type: " + command.getCommandType());
@@ -110,11 +110,6 @@ public class WebSocketHandler{
     System.out.println("\n⚡ [DEBUG] onWebSocketConnect triggered");
     System.out.println("\n🔌 [WS-HANDLER] New WebSocket connection from: " + session.getRemoteAddress());
 
-    RemoteEndpoint remote = session.getRemote();
-
-    //this.session = sess;
-    //this.remote = sess.getRemote();
-    //super.onWebSocketConnect(session);
     System.out.println("🔌 [WS-HANDLER] Session initialized with ID: " + session.hashCode());
   }
 
@@ -252,11 +247,8 @@ public class WebSocketHandler{
 
       ChessGame.TeamColor currentTeam = chessGame.getTeamTurn();
       if (chessGame.isInCheckmate(currentTeam)) {
-        ChessGame.TeamColor winner = (currentTeam == ChessGame.TeamColor.WHITE) ?
-                ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE;
-        broadcastNotification(command.getGameID(),
-                String.format("Checkmate! %s wins!", winner),
-                null);  // Send to everyone
+        ChessGame.TeamColor winner = (currentTeam == ChessGame.TeamColor.WHITE) ? ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE;
+        broadcastNotification(command.getGameID(), String.format("Checkmate! %s wins!", winner),null);  // Send to everyone
       } else if (chessGame.isInCheck(currentTeam)) {
         broadcastNotification(command.getGameID(),
                 String.format("%s is in check!", currentTeam),
@@ -291,29 +283,33 @@ public class WebSocketHandler{
     } catch (DataAccessException e) {
       throw new RuntimeException(e);
     }
-
-    //System.out.println("📤 [CONNECT] Sending LOAD_GAME message: " + loadGameJson);
-//    try {
-//      session.getRemote().sendString(loadGameJson);
-//    } catch (IOException e) {
-//      System.err.println("❌ [CONNECT] Failed to send LOAD_GAME message: ");
-//      throw new RuntimeException(e);
-//    }
-    //System.out.println("✅ [CONNECT] LOAD_GAME message sent successfully");
-
   }
 
 
 
-  private void handleLeave(Session session, UserGameCommand command, AuthData auth) {
-    Map<Session, String> gameSessions = gameConnections.get(command.getGameID());
+  private void handleLeave(Session session, UserGameCommand command, AuthData auth, GameData game) {
+    Map<Session, String> gameSessions=gameConnections.get(command.getGameID());
     if (gameSessions != null) {
       gameSessions.remove(session);
       broadcastNotification(command.getGameID(),
               String.format("%s left the game", auth.username()),
               session);
     }
-  }
+
+    try {
+      if (auth.username().equals(game.whiteUsername())) {
+        GameData updatedGame = new GameData(game.gameID(), null, game.blackUsername(), game.gameName(), game.game());
+        Server.gameDAO.updateGame(updatedGame);
+      } else if (auth.username().equals(game.blackUsername())) {
+        GameData updatedGame = new GameData(game.gameID(), game.whiteUsername(), null, game.gameName(), game.game());
+        Server.gameDAO.updateGame(updatedGame);
+
+      }
+    } catch(DataAccessException e){
+        throw new RuntimeException(e);
+      }
+
+    }
 
 
   private void sendError(Session session, String message) {
