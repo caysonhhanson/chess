@@ -275,6 +275,10 @@ public class WebSocketHandler{
       sendError(session, "Error: only players can resign");
       return;
     }
+    if (game.game().getTeamTurn() == ChessGame.TeamColor.RESIGNED) {
+      sendError(session, "SUCK IT HE ALREADY RESIGNED");
+      return;
+    }
 
     game.game().setTeamTurn(ChessGame.TeamColor.RESIGNED);
     System.out.println("Team turn: " + game.game().getTeamTurn().toString());
