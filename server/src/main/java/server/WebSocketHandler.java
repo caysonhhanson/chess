@@ -173,79 +173,119 @@ public class WebSocketHandler {
       return;
     }
 
-    ChessGame chessGame=game.game();
+    // Validate game state and player permissions
+    if (!isValidMoveAttempt(session, auth, game)) {
+      return;
+    }
 
-    boolean isWhite=auth.username().equals(game.whiteUsername());
-    boolean isBlack=auth.username().equals(game.blackUsername());
-
-    if (!isWhite && !isBlack) {
-      sendError(session, "Error: not a player in the game");
-      return;
-    }
-    System.out.println("Team turn is: " + game.game().getTeamTurn().toString());
-    if ((chessGame.getTeamTurn() == ChessGame.TeamColor.RESIGNED)) {
-      System.out.println("Game is over");
-      sendError(session, "Game is Over");
-      return;
-    }
-    if ((chessGame.getTeamTurn() != ChessGame.TeamColor.WHITE && isWhite) || (chessGame.getTeamTurn() != ChessGame.TeamColor.BLACK && isBlack)) {
-      sendError(session, "Error: not your turn");
-      return;
-    }
-    if (chessGame.isInCheckmate(ChessGame.TeamColor.WHITE) || chessGame.isInCheckmate(ChessGame.TeamColor.BLACK)) {
-      sendError(session, "No moves to be made.");
-      return;
-    }
+    ChessGame chessGame = game.game();
     try {
+      // Make the move and update game state
       chessGame.makeMove(moveCommand.getMove());
       Server.gameDAO.updateGame(game);
 
-      Map<Session, String> gameSessions=GAME_CONNECTIONS.get(command.getGameID());
-      if (gameSessions != null) {
-        LoadGame loadGame=new LoadGame(chessGame);
-        String loadGameJson=gson.toJson(loadGame);
+      // Send updates to all connected clients
+      sendGameUpdates(command.getGameID(), game, auth, moveCommand);
 
-        String moveNotification=String.format("%s moved from %s to %s", auth.username(), moveCommand.getMove().getStartPosition(),
-                moveCommand.getMove().getEndPosition());
-        Notification notification=new Notification(moveNotification);
-        String notificationJson=gson.toJson(notification);
-
-        for (Map.Entry<Session, String> entry : gameSessions.entrySet()) {
-          Session clientSession=entry.getKey();
-          String username=entry.getValue();
-
-          if (clientSession.isOpen()) {
-            // Always send game state update
-            clientSession.getRemote().sendString(loadGameJson);
-
-            // Send notification based on team and observer status
-            if (isWhite) {
-              // If white moved, send to black player and observers
-              if (username.equals(game.blackUsername()) || (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
-                clientSession.getRemote().sendString(notificationJson);
-              }
-            } else {
-              // If black moved, send to white player and observers
-              if (username.equals(game.whiteUsername()) || (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
-                clientSession.getRemote().sendString(notificationJson);
-              }
-            }
-          }
-        }
-      }
-
-      ChessGame.TeamColor currentTeam=chessGame.getTeamTurn();
-      if (chessGame.isInCheckmate(currentTeam)) {
-        ChessGame.TeamColor winner=(currentTeam == ChessGame.TeamColor.WHITE) ? ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE;
-        broadcastNotification(command.getGameID(), String.format("Checkmate! %s wins!", winner), null);  // Send to everyone
-      } else if (chessGame.isInCheck(currentTeam)) {
-        broadcastNotification(command.getGameID(), String.format("%s is in check!", currentTeam), null);  // Send to everyone
-      }
+      // Check and handle game state changes
+      handlePostMoveGameState(command.getGameID(), chessGame);
 
     } catch (InvalidMoveException e) {
       sendError(session, "Error: invalid move");
     } catch (Exception e) {
       sendError(session, "Error: " + e.getMessage());
+    }
+  }
+
+  private boolean isValidMoveAttempt(Session session, AuthData auth, GameData game) {
+    ChessGame chessGame = game.game();
+    boolean isWhite = auth.username().equals(game.whiteUsername());
+    boolean isBlack = auth.username().equals(game.blackUsername());
+
+    // Check if user is a player
+    if (!isWhite && !isBlack) {
+      sendError(session, "Error: not a player in the game");
+      return false;
+    }
+
+    // Check if game is already over
+    if (chessGame.getTeamTurn() == ChessGame.TeamColor.RESIGNED) {
+      sendError(session, "Game is Over");
+      return false;
+    }
+
+    // Check if it's player's turn
+    if (!isPlayersTurn(chessGame, isWhite, isBlack)) {
+      sendError(session, "Error: not your turn");
+      return false;
+    }
+
+    // Check if game is in checkmate
+    if (chessGame.isInCheckmate(ChessGame.TeamColor.WHITE) ||
+            chessGame.isInCheckmate(ChessGame.TeamColor.BLACK)) {
+      sendError(session, "No moves to be made.");
+      return false;
+    }
+
+    return true;
+  }
+
+  private boolean isPlayersTurn(ChessGame game, boolean isWhite, boolean isBlack) {
+    return !((game.getTeamTurn() != ChessGame.TeamColor.WHITE && isWhite) ||
+            (game.getTeamTurn() != ChessGame.TeamColor.BLACK && isBlack));
+  }
+
+  private void sendGameUpdates(int gameId, GameData game, AuthData auth, MakeMove moveCommand) throws IOException {
+    Map<Session, String> gameSessions = GAME_CONNECTIONS.get(gameId);
+    if (gameSessions == null) return;
+
+    // Prepare update messages
+    LoadGame loadGame = new LoadGame(game.game());
+    String loadGameJson = gson.toJson(loadGame);
+
+    String moveNotification = String.format("%s moved from %s to %s",
+            auth.username(),
+            moveCommand.getMove().getStartPosition(),
+            moveCommand.getMove().getEndPosition());
+    String notificationJson = gson.toJson(new Notification(moveNotification));
+
+    // Send updates to all connected clients
+    boolean isWhiteMove = auth.username().equals(game.whiteUsername());
+    for (Map.Entry<Session, String> entry : gameSessions.entrySet()) {
+      if (!entry.getKey().isOpen()) continue;
+
+      sendUpdatesToClient(entry.getKey(), entry.getValue(), game,
+              loadGameJson, notificationJson, isWhiteMove);
+    }
+  }
+
+  private void sendUpdatesToClient(Session clientSession, String username,
+                                   GameData game, String loadGameJson,
+                                   String notificationJson, boolean isWhiteMove) throws IOException {
+    // Always send game state update
+    clientSession.getRemote().sendString(loadGameJson);
+
+    boolean isObserver = !username.equals(game.whiteUsername()) &&
+            !username.equals(game.blackUsername());
+    boolean shouldNotify = isWhiteMove ?
+            (username.equals(game.blackUsername()) || isObserver) :
+            (username.equals(game.whiteUsername()) || isObserver);
+
+    if (shouldNotify) {
+      clientSession.getRemote().sendString(notificationJson);
+    }
+  }
+
+  private void handlePostMoveGameState(int gameId, ChessGame chessGame) {
+    ChessGame.TeamColor currentTeam = chessGame.getTeamTurn();
+
+    if (chessGame.isInCheckmate(currentTeam)) {
+      ChessGame.TeamColor winner = (currentTeam == ChessGame.TeamColor.WHITE) ?
+              ChessGame.TeamColor.BLACK :
+              ChessGame.TeamColor.WHITE;
+      broadcastNotification(gameId, String.format("Checkmate! %s wins!", winner), null);
+    } else if (chessGame.isInCheck(currentTeam)) {
+      broadcastNotification(gameId, String.format("%s is in check!", currentTeam), null);
     }
   }
 
