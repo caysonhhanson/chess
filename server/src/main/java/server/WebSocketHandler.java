@@ -400,20 +400,45 @@ public class WebSocketHandler {
 
   @OnWebSocketClose
   public void onWebSocketClose(Session session, int statusCode, String reason) {
+    logCloseEvent(session, statusCode, reason);
+    handleSessionClosure(session);
+  }
+
+  private void logCloseEvent(Session session, int statusCode, String reason) {
     System.out.println("\n⚡ [DEBUG] onWebSocketClose triggered");
-    //Session session = getSession();
     System.out.println("\n🔴 [WS-CLOSE] Connection closing for session " + session.hashCode());
     System.out.println("🔴 [WS-CLOSE] Status: " + statusCode + ", Reason: " + reason);
+  }
 
-    if (session != null) {
-      // Clean up all game connections for this session
-      GAME_CONNECTIONS.values().forEach(sessions -> {
-        String username=sessions.remove(session);
-        if (username != null) {
-          broadcast(sessions, gson.toJson(new Notification(username + " disconnected")));
-        }
-      });
+  private void handleSessionClosure(Session session) {
+    if (session == null) {
+      return;
     }
+
+    // Clean up all game connections for this session
+    GAME_CONNECTIONS.values().forEach(this::handleGameSessionClosure);
+  }
+
+  private void handleGameSessionClosure(Map<Session, String> sessions) {
+    if (sessions == null) {
+      return;
+    }
+
+    for (Map.Entry<Session, String> entry : sessions.entrySet()) {
+      Session currentSession = entry.getKey();
+      String username = entry.getValue();
+
+      if (username != null) {
+        notifyDisconnection(sessions, username);
+      }
+      sessions.remove(currentSession);
+    }
+  }
+
+  private void notifyDisconnection(Map<Session, String> sessions, String username) {
+    Notification notification = new Notification(username + " disconnected");
+    String message = gson.toJson(notification);
+    broadcast(sessions, message);
   }
 
   @OnWebSocketError
