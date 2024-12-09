@@ -69,15 +69,12 @@ public class ChessBoardMaker {
   }
 
   private static void drawRow(int row, ChessBoard board, boolean blackPerspective, Collection<ChessMove> highlights) {
-    // Draw row number at start
     System.out.print(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + " " + row + "  " + RESET_TEXT_BOLD_FAINT);
 
-    // Draw each square in the row
     for (int col = 1; col <= 8; col++) {
       drawSquare(row, col, board, blackPerspective, highlights);
     }
 
-    // Draw row number at end
     System.out.println(SET_TEXT_COLOR_YELLOW + SET_TEXT_BOLD + "  " + row + RESET_TEXT_BOLD_FAINT);
   }
 
@@ -88,11 +85,9 @@ public class ChessBoardMaker {
     boolean isLightSquare = ((row + displayCol) % 2 == 1);
     boolean isHighlighted = isPositionHighlighted(position, highlights);
 
-    // Apply square formatting
     String bgColor = getSquareColor(isHighlighted, isLightSquare);
     System.out.print(bgColor);
 
-    // Draw the piece
     ChessPiece piece = board.getPiece(position);
     if (piece != null) {
       String textColor = getPieceColor(piece, blackPerspective);
