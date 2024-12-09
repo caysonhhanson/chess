@@ -297,21 +297,21 @@ public class WebSocketHandler {
   }
 
   private void handleResign(Session session, UserGameCommand command, AuthData auth, GameData game) {
-    if (!auth.username().equals(game.whiteUsername()) && !auth.username().equals(game.blackUsername())) {
+    if (!auth.username().equals(game.whiteUsername()) &&
+            !auth.username().equals(game.blackUsername())) {
       sendError(session, "Error: only players can resign");
       return;
     }
+
     if (game.game().getTeamTurn() == ChessGame.TeamColor.RESIGNED) {
-      sendError(session, "SUCK IT HE ALREADY RESIGNED");
+      sendError(session, "Error: game already resigned");
       return;
-
-
     }
 
     game.game().setTeamTurn(ChessGame.TeamColor.RESIGNED);
     System.out.println("Team turn: " + game.game().getTeamTurn().toString());
-    broadcastNotification(command.getGameID(), String.format("%s resigned from the game", auth.username()), null);
-
+    broadcastNotification(command.getGameID(),
+            String.format("%s resigned from the game", auth.username()), null);
 
     try {
       Server.gameDAO.updateGame(game);
@@ -322,25 +322,36 @@ public class WebSocketHandler {
 
 
   private void handleLeave(Session session, UserGameCommand command, AuthData auth, GameData game) {
-    Map<Session, String> gameSessions=GAME_CONNECTIONS.get(command.getGameID());
+    Map<Session, String> gameSessions = GAME_CONNECTIONS.get(command.getGameID());
     if (gameSessions != null) {
       gameSessions.remove(session);
       broadcastNotification(command.getGameID(), String.format("%s left the game", auth.username()), session);
     }
 
-    try {
-      if (auth.username().equals(game.whiteUsername())) {
-        GameData updatedGame=new GameData(game.gameID(), null, game.blackUsername(), game.gameName(), game.game());
-        Server.gameDAO.updateGame(updatedGame);
-      } else if (auth.username().equals(game.blackUsername())) {
-        GameData updatedGame=new GameData(game.gameID(), game.whiteUsername(), null, game.gameName(), game.game());
-        Server.gameDAO.updateGame(updatedGame);
+    updateGameAfterLeave(auth, game);
+  }
 
+  private void updateGameAfterLeave(AuthData auth, GameData game) {
+    try {
+      GameData updatedGame = createUpdatedGameData(auth, game);
+      if (updatedGame != null) {
+        Server.gameDAO.updateGame(updatedGame);
       }
     } catch (DataAccessException e) {
       throw new RuntimeException(e);
     }
+  }
 
+  private GameData createUpdatedGameData(AuthData auth, GameData game) {
+    if (auth.username().equals(game.whiteUsername())) {
+      return new GameData(game.gameID(), null, game.blackUsername(),
+              game.gameName(), game.game());
+    }
+    if (auth.username().equals(game.blackUsername())) {
+      return new GameData(game.gameID(), game.whiteUsername(), null,
+              game.gameName(), game.game());
+    }
+    return null;
   }
 
 
