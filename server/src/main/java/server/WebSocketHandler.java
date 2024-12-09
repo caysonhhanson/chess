@@ -364,23 +364,47 @@ public class WebSocketHandler {
 
 
   private void broadcastNotification(int gameId, String message, Session exclude) {
+    String jsonNotification = createNotificationJson(message);
+    if (jsonNotification == null) {
+      return;
+    }
+
+    Map<Session, String> sessions = GAME_CONNECTIONS.get(gameId);
+    if (sessions == null) {
+      return;
+    }
+
+    broadcastToSessions(sessions, jsonNotification, exclude);
+  }
+
+  private String createNotificationJson(String message) {
     try {
-      Notification notification=new Notification(message);
-      String jsonNotification=gson.toJson(notification);
-      Map<Session, String> sessions=GAME_CONNECTIONS.get(gameId);
-      if (sessions != null) {
-        for (Session session : sessions.keySet()) {
-          if (session != exclude && session.isOpen()) {
-            try {
-              session.getRemote().sendString(jsonNotification);
-            } catch (Exception e) {
-              System.err.println("❌ [WS-BROADCAST] Failed to send to session: " + e.getMessage());
-            }
-          }
-        }
-      }
+      Notification notification = new Notification(message);
+      return gson.toJson(notification);
     } catch (Exception e) {
-      System.err.println("❌ [WS-BROADCAST] Failed to broadcast notification: " + e.getMessage());
+      System.err.println("❌ [WS-BROADCAST] Failed to create notification JSON: " + e.getMessage());
+      return null;
+    }
+  }
+
+  private void broadcastToSessions(Map<Session, String> sessions, String jsonNotification, Session exclude) {
+    for (Session session : sessions.keySet()) {
+      if (shouldSkipSession(session, exclude)) {
+        continue;
+      }
+      sendNotification(session, jsonNotification);
+    }
+  }
+
+  private boolean shouldSkipSession(Session session, Session exclude) {
+    return session == exclude || !session.isOpen();
+  }
+
+  private void sendNotification(Session session, String jsonNotification) {
+    try {
+      session.getRemote().sendString(jsonNotification);
+    } catch (Exception e) {
+      System.err.println("❌ [WS-BROADCAST] Failed to send to session: " + e.getMessage());
     }
   }
 
