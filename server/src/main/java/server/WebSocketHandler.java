@@ -237,9 +237,10 @@ public class WebSocketHandler {
 
   private void sendGameUpdates(int gameId, GameData game, AuthData auth, MakeMove moveCommand) throws IOException {
     Map<Session, String> gameSessions = GAME_CONNECTIONS.get(gameId);
-    if (gameSessions == null) return;
+    if (gameSessions == null) {
+      return;
+    }
 
-    // Prepare update messages
     LoadGame loadGame = new LoadGame(game.game());
     String loadGameJson = gson.toJson(loadGame);
 
@@ -249,10 +250,11 @@ public class WebSocketHandler {
             moveCommand.getMove().getEndPosition());
     String notificationJson = gson.toJson(new Notification(moveNotification));
 
-    // Send updates to all connected clients
     boolean isWhiteMove = auth.username().equals(game.whiteUsername());
     for (Map.Entry<Session, String> entry : gameSessions.entrySet()) {
-      if (!entry.getKey().isOpen()) continue;
+      if (!entry.getKey().isOpen()) {
+        continue;
+      }
 
       sendUpdatesToClient(entry.getKey(), entry.getValue(), game,
               loadGameJson, notificationJson, isWhiteMove);
@@ -286,13 +288,6 @@ public class WebSocketHandler {
       broadcastNotification(gameId, String.format("Checkmate! %s wins!", winner), null);
     } else if (chessGame.isInCheck(currentTeam)) {
       broadcastNotification(gameId, String.format("%s is in check!", currentTeam), null);
-    }
-  }
-
-  private void SendGame(ChessGame.TeamColor color, String username, GameData game, Session clientSession, String notificationJson) throws IOException {
-    // If white moved, send to black player and observers
-    if (username.equals(game.blackUsername()) || (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
-      clientSession.getRemote().sendString(notificationJson);
     }
   }
 
