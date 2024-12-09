@@ -141,14 +141,6 @@ public class WebSocketDecoder {
     }
   }
 
-  @OnOpen
-  public void onOpen(Session session) {
-    System.out.println("🔌 [WS-CLIENT] WebSocket connection opened");
-    System.out.println("ℹ️ [WS-CLIENT] Session ID: " + session.getId());
-    this.session = session;
-    connectLatch.countDown();
-  }
-
   @OnMessage
   public void onMessage(String message) {
     System.out.println("\n📥 [WS-CLIENT] Received message: " + message);
@@ -194,11 +186,6 @@ public class WebSocketDecoder {
     }
   }
 
-  @OnClose
-  public void onClose(Session session, CloseReason reason) {
-    System.out.println("\n🔴 [WS-CLIENT] WebSocket connection closed");
-    System.out.println("🔴 [WS-CLIENT] Close reason: " + reason);
-  }
 
   @OnError
   public void onError(Throwable error) {

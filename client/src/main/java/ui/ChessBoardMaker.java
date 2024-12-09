@@ -1,10 +1,12 @@
 package ui;
 
 import chess.*;
-import static ui.EscapeSequences.*;
+
 import java.util.Collection;
-import java.util.Queue;
 import java.util.LinkedList;
+import java.util.Queue;
+
+import static ui.EscapeSequences.*;
 
 public class ChessBoardMaker {
   private static final Queue<String> notifications = new LinkedList<>();
@@ -104,7 +106,9 @@ public class ChessBoardMaker {
   }
 
   private static String getPieceString(ChessPiece piece) {
-    if (piece == null) return EMPTY;
+    if (piece == null) {
+      return EMPTY;
+    }
     return switch (piece.getPieceType()) {
       case KING -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_KING : BLACK_KING;
       case QUEEN -> piece.getTeamColor() == ChessGame.TeamColor.WHITE ? WHITE_QUEEN : BLACK_QUEEN;

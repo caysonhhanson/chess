@@ -54,7 +54,9 @@ public class GameplayREPL {
   }
 
   private void processCommand(String[] tokens) {
-    if (tokens.length == 0) return;
+    if (tokens.length == 0) {
+      return;
+    }
 
     switch (tokens[0]) {
       case "help" -> displayHelp();

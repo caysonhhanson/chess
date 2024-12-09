@@ -1,49 +1,44 @@
 package server;
 
-import chess.*;
+import chess.ChessGame;
+import chess.InvalidMoveException;
 import com.google.gson.*;
 import dataaccess.DataAccessException;
 import model.AuthData;
 import model.GameData;
-import org.eclipse.jetty.websocket.api.RemoteEndpoint;
-import org.eclipse.jetty.websocket.api.annotations.WebSocket;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
-//import org.eclipse.jetty.websocket.api.RemoteEndpoint;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
-
 import org.eclipse.jetty.websocket.api.Session;
-import org.eclipse.jetty.websocket.api.WebSocketAdapter;
 import org.eclipse.jetty.websocket.api.annotations.*;
-import websocket.commands.*;
-import websocket.messages.*;
+import websocket.commands.Leave;
+import websocket.commands.MakeMove;
+import websocket.commands.Resign;
+import websocket.commands.UserGameCommand;
 import websocket.messages.Error;
+import websocket.messages.LoadGame;
+import websocket.messages.Notification;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @WebSocket
-public class WebSocketHandler{
-  private static final Map<Integer, Map<Session, String>> gameConnections = new ConcurrentHashMap<>();
+public class WebSocketHandler {
+  private static final Map<Integer, Map<Session, String>> GAME_CONNECTIONS=new ConcurrentHashMap<>();
   private final Gson gson;
 
   public WebSocketHandler() {
-    this.gson = new GsonBuilder()
-            .registerTypeAdapter(UserGameCommand.class, (JsonDeserializer<UserGameCommand>) (json, typeOfT, context) -> {
-              JsonObject obj = json.getAsJsonObject();
-              String commandType = obj.get("commandType").getAsString();
-              String authToken = obj.get("authToken").getAsString();
-              Integer gameID = obj.get("gameID").getAsInt();
+    this.gson=new GsonBuilder().registerTypeAdapter(UserGameCommand.class, (JsonDeserializer<UserGameCommand>) (json, typeOfT, context) -> {
+      JsonObject obj=json.getAsJsonObject();
+      String commandType=obj.get("commandType").getAsString();
+      String authToken=obj.get("authToken").getAsString();
+      Integer gameID=obj.get("gameID").getAsInt();
 
-              return switch (commandType) {
-                case "MAKE_MOVE" -> context.deserialize(json, MakeMove.class);
-                case "CONNECT" -> new UserGameCommand(UserGameCommand.CommandType.CONNECT, authToken, gameID);
-                case "LEAVE" -> new Leave(authToken, gameID);
-                case "RESIGN" -> new Resign(authToken, gameID);
-                default -> throw new JsonParseException("Unknown command type: " + commandType);
-              };
-            }).create();
+      return switch (commandType) {
+        case "MAKE_MOVE" -> context.deserialize(json, MakeMove.class);
+        case "CONNECT" -> new UserGameCommand(UserGameCommand.CommandType.CONNECT, authToken, gameID);
+        case "LEAVE" -> new Leave(authToken, gameID);
+        case "RESIGN" -> new Resign(authToken, gameID);
+        default -> throw new JsonParseException("Unknown command type: " + commandType);
+      };
+    }).create();
   }
 
 
@@ -51,10 +46,10 @@ public class WebSocketHandler{
   public void onMessage(Session session, String message) {
     System.out.println("\n⚡ [DEBUG] onWebSocketText triggered with message: " + message);
     try {
-      UserGameCommand command = gson.fromJson(message, UserGameCommand.class);
+      UserGameCommand command=gson.fromJson(message, UserGameCommand.class);
       System.out.println("🔄 [WS-MESSAGE] Parsed command type: " + command.getCommandType());
 
-      AuthData auth = Server.authDAO.getAuth(command.getAuthToken());
+      AuthData auth=Server.authDAO.getAuth(command.getAuthToken());
       if (auth == null) {
         System.out.println("❌ [WS-MESSAGE] Invalid auth token: " + command.getAuthToken().toString());
 
@@ -62,9 +57,9 @@ public class WebSocketHandler{
         return;
       }
 
-      GameData game = null;
+      GameData game=null;
       try {
-        game = Server.gameDAO.getGame(command.getGameID());
+        game=Server.gameDAO.getGame(command.getGameID());
         if (game == null) {
           System.out.println("❌ [WS-MESSAGE] Game not found: " + command.getGameID());
           sendError(session, "Error: game not found");
@@ -120,16 +115,13 @@ public class WebSocketHandler{
       System.out.println("🔄 [CONNECT] Game ID: " + command.getGameID());
       System.out.println("🔄 [CONNECT] Game state: " + (game != null ? "found" : "null"));
 
-      Map<Session, String> gameSessions = gameConnections.computeIfAbsent(
-              command.getGameID(),
-              k -> new ConcurrentHashMap<>()
-      );
+      Map<Session, String> gameSessions=GAME_CONNECTIONS.computeIfAbsent(command.getGameID(), k -> new ConcurrentHashMap<>());
       gameSessions.put(session, auth.username());
       System.out.println("✅ [CONNECT] Added to game connections. Current players in game: " + gameSessions.size());
 
 
-      LoadGame loadGameMessage = new LoadGame(game.game());
-      String loadGameJson = gson.toJson(loadGameMessage);
+      LoadGame loadGameMessage=new LoadGame(game.game());
+      String loadGameJson=gson.toJson(loadGameMessage);
       System.out.println("📤 [CONNECT] Sending LOAD_GAME message: " + loadGameJson);
 
       try {
@@ -144,13 +136,13 @@ public class WebSocketHandler{
       // Determine player type and create notification
       String notificationMessage;
       if (auth.username().equals(game.whiteUsername())) {
-        notificationMessage = String.format("%s joined as WHITE player", auth.username());
+        notificationMessage=String.format("%s joined as WHITE player", auth.username());
         System.out.println("👤 [CONNECT] User is WHITE player");
       } else if (auth.username().equals(game.blackUsername())) {
-        notificationMessage = String.format("%s joined as BLACK player", auth.username());
+        notificationMessage=String.format("%s joined as BLACK player", auth.username());
         System.out.println("👤 [CONNECT] User is BLACK player");
       } else {
-        notificationMessage = String.format("%s joined as an observer", auth.username());
+        notificationMessage=String.format("%s joined as an observer", auth.username());
         System.out.println("👀 [CONNECT] User is OBSERVER");
       }
 
@@ -180,17 +172,17 @@ public class WebSocketHandler{
       return;
     }
 
-    ChessGame chessGame = game.game();
+    ChessGame chessGame=game.game();
 
-    boolean isWhite = auth.username().equals(game.whiteUsername());
-    boolean isBlack = auth.username().equals(game.blackUsername());
+    boolean isWhite=auth.username().equals(game.whiteUsername());
+    boolean isBlack=auth.username().equals(game.blackUsername());
 
     if (!isWhite && !isBlack) {
       sendError(session, "Error: not a player in the game");
       return;
     }
     System.out.println("Team turn is: " + game.game().getTeamTurn().toString());
-    if ((chessGame.getTeamTurn() == ChessGame.TeamColor.RESIGNED)){
+    if ((chessGame.getTeamTurn() == ChessGame.TeamColor.RESIGNED)) {
       System.out.println("Game is over");
       sendError(session, "Game is Over");
       return;
@@ -199,7 +191,7 @@ public class WebSocketHandler{
       sendError(session, "Error: not your turn");
       return;
     }
-    if (chessGame.isInCheckmate(ChessGame.TeamColor.WHITE) || chessGame.isInCheckmate(ChessGame.TeamColor.BLACK)){
+    if (chessGame.isInCheckmate(ChessGame.TeamColor.WHITE) || chessGame.isInCheckmate(ChessGame.TeamColor.BLACK)) {
       sendError(session, "No moves to be made.");
       return;
     }
@@ -207,21 +199,18 @@ public class WebSocketHandler{
       chessGame.makeMove(moveCommand.getMove());
       Server.gameDAO.updateGame(game);
 
-      Map<Session, String> gameSessions = gameConnections.get(command.getGameID());
+      Map<Session, String> gameSessions=GAME_CONNECTIONS.get(command.getGameID());
       if (gameSessions != null) {
-        LoadGame loadGame = new LoadGame(chessGame);
-        String loadGameJson = gson.toJson(loadGame);
+        LoadGame loadGame=new LoadGame(chessGame);
+        String loadGameJson=gson.toJson(loadGame);
 
-        String moveNotification = String.format("%s moved from %s to %s",
-                auth.username(),
-                moveCommand.getMove().getStartPosition(),
-                moveCommand.getMove().getEndPosition());
-        Notification notification = new Notification(moveNotification);
-        String notificationJson = gson.toJson(notification);
+        String moveNotification=String.format("%s moved from %s to %s", auth.username(), moveCommand.getMove().getStartPosition(), moveCommand.getMove().getEndPosition());
+        Notification notification=new Notification(moveNotification);
+        String notificationJson=gson.toJson(notification);
 
         for (Map.Entry<Session, String> entry : gameSessions.entrySet()) {
-          Session clientSession = entry.getKey();
-          String username = entry.getValue();
+          Session clientSession=entry.getKey();
+          String username=entry.getValue();
 
           if (clientSession.isOpen()) {
             // Always send game state update
@@ -230,14 +219,12 @@ public class WebSocketHandler{
             // Send notification based on team and observer status
             if (isWhite) {
               // If white moved, send to black player and observers
-              if (username.equals(game.blackUsername()) ||
-                      (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
+              if (username.equals(game.blackUsername()) || (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
                 clientSession.getRemote().sendString(notificationJson);
               }
             } else {
               // If black moved, send to white player and observers
-              if (username.equals(game.whiteUsername()) ||
-                      (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
+              if (username.equals(game.whiteUsername()) || (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
                 clientSession.getRemote().sendString(notificationJson);
               }
             }
@@ -245,14 +232,12 @@ public class WebSocketHandler{
         }
       }
 
-      ChessGame.TeamColor currentTeam = chessGame.getTeamTurn();
+      ChessGame.TeamColor currentTeam=chessGame.getTeamTurn();
       if (chessGame.isInCheckmate(currentTeam)) {
-        ChessGame.TeamColor winner = (currentTeam == ChessGame.TeamColor.WHITE) ? ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE;
-        broadcastNotification(command.getGameID(), String.format("Checkmate! %s wins!", winner),null);  // Send to everyone
+        ChessGame.TeamColor winner=(currentTeam == ChessGame.TeamColor.WHITE) ? ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE;
+        broadcastNotification(command.getGameID(), String.format("Checkmate! %s wins!", winner), null);  // Send to everyone
       } else if (chessGame.isInCheck(currentTeam)) {
-        broadcastNotification(command.getGameID(),
-                String.format("%s is in check!", currentTeam),
-                null);  // Send to everyone
+        broadcastNotification(command.getGameID(), String.format("%s is in check!", currentTeam), null);  // Send to everyone
       }
 
     } catch (InvalidMoveException e) {
@@ -270,12 +255,13 @@ public class WebSocketHandler{
     if (game.game().getTeamTurn() == ChessGame.TeamColor.RESIGNED) {
       sendError(session, "SUCK IT HE ALREADY RESIGNED");
       return;
+
+
     }
 
     game.game().setTeamTurn(ChessGame.TeamColor.RESIGNED);
     System.out.println("Team turn: " + game.game().getTeamTurn().toString());
-    broadcastNotification(command.getGameID(),
-            String.format("%s resigned from the game", auth.username()), null);
+    broadcastNotification(command.getGameID(), String.format("%s resigned from the game", auth.username()), null);
 
 
     try {
@@ -286,37 +272,34 @@ public class WebSocketHandler{
   }
 
 
-
   private void handleLeave(Session session, UserGameCommand command, AuthData auth, GameData game) {
-    Map<Session, String> gameSessions=gameConnections.get(command.getGameID());
+    Map<Session, String> gameSessions=GAME_CONNECTIONS.get(command.getGameID());
     if (gameSessions != null) {
       gameSessions.remove(session);
-      broadcastNotification(command.getGameID(),
-              String.format("%s left the game", auth.username()),
-              session);
+      broadcastNotification(command.getGameID(), String.format("%s left the game", auth.username()), session);
     }
 
     try {
       if (auth.username().equals(game.whiteUsername())) {
-        GameData updatedGame = new GameData(game.gameID(), null, game.blackUsername(), game.gameName(), game.game());
+        GameData updatedGame=new GameData(game.gameID(), null, game.blackUsername(), game.gameName(), game.game());
         Server.gameDAO.updateGame(updatedGame);
       } else if (auth.username().equals(game.blackUsername())) {
-        GameData updatedGame = new GameData(game.gameID(), game.whiteUsername(), null, game.gameName(), game.game());
+        GameData updatedGame=new GameData(game.gameID(), game.whiteUsername(), null, game.gameName(), game.game());
         Server.gameDAO.updateGame(updatedGame);
 
       }
-    } catch(DataAccessException e){
-        throw new RuntimeException(e);
-      }
-
+    } catch (DataAccessException e) {
+      throw new RuntimeException(e);
     }
+
+  }
 
 
   private void sendError(Session session, String message) {
     try {
       System.out.println("session for sending error: " + session.hashCode());
       System.out.println("session get remote: " + session.getRemote().hashCode());
-      Error error = new Error(message);
+      Error error=new Error(message);
 
       session.getRemote().sendString(gson.toJson(error));
     } catch (Exception e) {
@@ -327,9 +310,9 @@ public class WebSocketHandler{
 
   private void broadcastNotification(int gameId, String message, Session exclude) {
     try {
-      Notification notification = new Notification(message);
-      String jsonNotification = gson.toJson(notification);
-      Map<Session, String> sessions = gameConnections.get(gameId);
+      Notification notification=new Notification(message);
+      String jsonNotification=gson.toJson(notification);
+      Map<Session, String> sessions=GAME_CONNECTIONS.get(gameId);
       if (sessions != null) {
         for (Session session : sessions.keySet()) {
           if (session != exclude && session.isOpen()) {
@@ -369,8 +352,8 @@ public class WebSocketHandler{
 
     if (session != null) {
       // Clean up all game connections for this session
-      gameConnections.values().forEach(sessions -> {
-        String username = sessions.remove(session);
+      GAME_CONNECTIONS.values().forEach(sessions -> {
+        String username=sessions.remove(session);
         if (username != null) {
           broadcast(sessions, gson.toJson(new Notification(username + " disconnected")));
         }
