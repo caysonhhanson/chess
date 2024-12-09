@@ -25,7 +25,7 @@ public class WebSocketTests {
     private WebsocketUser black;
     private WebsocketUser observer;
     private Integer gameID;
-    private static final Gson gson = TestFactory.getGsonBuilder().create();
+    private static final Gson GSON= TestFactory.getGsonBuilder().create();
     @AfterAll
     static void stopServer() {
         server.stop();

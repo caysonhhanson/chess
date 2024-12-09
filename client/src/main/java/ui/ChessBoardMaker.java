@@ -9,13 +9,13 @@ import java.util.Queue;
 import static ui.EscapeSequences.*;
 
 public class ChessBoardMaker {
-  private static final Queue<String> notifications = new LinkedList<>();
+  private static final Queue<String> NOTIFICATIONS= new LinkedList<>();
   private static final int MAX_NOTIFICATIONS = 5;
 
   public static void addNotification(String message) {
-    notifications.offer(message);
-    if (notifications.size() > MAX_NOTIFICATIONS) {
-      notifications.poll();
+    NOTIFICATIONS.offer(message);
+    if (NOTIFICATIONS.size() > MAX_NOTIFICATIONS) {
+      NOTIFICATIONS.poll();
     }
   }
 
@@ -30,11 +30,11 @@ public class ChessBoardMaker {
 
   private static void drawNotifications() {
     System.out.println(SET_TEXT_COLOR_GREEN + "Recent notifications:" + RESET_TEXT_COLOR);
-    if (notifications.isEmpty()) {
+    if (NOTIFICATIONS.isEmpty()) {
       System.out.println("No notifications");
       return;
     }
-    for (String notification : notifications) {
+    for (String notification : NOTIFICATIONS) {
       System.out.println(SET_TEXT_COLOR_BLUE + "→ " + notification + RESET_TEXT_COLOR);
     }
   }
