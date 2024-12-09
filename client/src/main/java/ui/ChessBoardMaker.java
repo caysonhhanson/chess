@@ -100,7 +100,7 @@ public class ChessBoardMaker {
 
   private static ChessPosition getPosition(int row, int col, boolean blackPerspective) {
     return blackPerspective ?
-            new ChessPosition(9 - row, 9 - col) :
+            new ChessPosition(row, 9 - col) :
             new ChessPosition(row, col);
   }
 
@@ -123,10 +123,8 @@ public class ChessBoardMaker {
   }
 
   private static String getPieceColor(ChessPiece piece, boolean blackPerspective) {
-    boolean isPieceWhite = piece.getTeamColor() == ChessGame.TeamColor.WHITE;
-    return blackPerspective ?
-            (isPieceWhite ? SET_TEXT_COLOR_RED : SET_TEXT_COLOR_BLUE) :
-            (isPieceWhite ? SET_TEXT_COLOR_BLUE : SET_TEXT_COLOR_RED);
+    return piece.getTeamColor() == ChessGame.TeamColor.WHITE ?
+            SET_TEXT_COLOR_BLUE : SET_TEXT_COLOR_RED;
   }
 
   private static String getPieceString(ChessPiece piece) {
