@@ -16,6 +16,7 @@ import websocket.messages.Error;
 import websocket.messages.LoadGame;
 import websocket.messages.Notification;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -204,7 +205,8 @@ public class WebSocketHandler {
         LoadGame loadGame=new LoadGame(chessGame);
         String loadGameJson=gson.toJson(loadGame);
 
-        String moveNotification=String.format("%s moved from %s to %s", auth.username(), moveCommand.getMove().getStartPosition(), moveCommand.getMove().getEndPosition());
+        String moveNotification=String.format("%s moved from %s to %s", auth.username(), moveCommand.getMove().getStartPosition(),
+                moveCommand.getMove().getEndPosition());
         Notification notification=new Notification(moveNotification);
         String notificationJson=gson.toJson(notification);
 
@@ -244,6 +246,13 @@ public class WebSocketHandler {
       sendError(session, "Error: invalid move");
     } catch (Exception e) {
       sendError(session, "Error: " + e.getMessage());
+    }
+  }
+
+  private void SendGame(ChessGame.TeamColor color, String username, GameData game, Session clientSession, String notificationJson) throws IOException {
+    // If white moved, send to black player and observers
+    if (username.equals(game.blackUsername()) || (!username.equals(game.whiteUsername()) && !username.equals(game.blackUsername()))) {
+      clientSession.getRemote().sendString(notificationJson);
     }
   }
 

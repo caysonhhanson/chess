@@ -1,8 +1,11 @@
 package ui;
 
 import client.ServerFacade;
-import static ui.EscapeSequences.*;
-import java.util.*;
+
+import java.util.Scanner;
+
+import static ui.EscapeSequences.RESET_BG_COLOR;
+import static ui.EscapeSequences.RESET_TEXT_COLOR;
 
 public class PreLoginREPL {
   private final ServerFacade facade;
@@ -17,8 +20,7 @@ public class PreLoginREPL {
     var scanner = new Scanner(System.in);
     System.out.println(RESET_TEXT_COLOR + RESET_BG_COLOR + "Chess Game - Type 'help' for commands");
 
-    boolean loggedIn = false;
-    while (!loggedIn) {
+    while (true) { // Continuous loop for login/logout cycle
       System.out.print("\n[OUT] >> ");
       String[] args = scanner.nextLine().toLowerCase().split(" ");
 
@@ -28,13 +30,21 @@ public class PreLoginREPL {
 
       switch (args[0]) {
         case "help" -> printCommands();
-        case "login" -> loggedIn = handleLogin(args);
-        case "register" -> loggedIn = handleRegistration(args);
+        case "login" -> {
+          if (handleLogin(args)) {
+            postLogin.run();
+            // After logout, loop continues
+          }
+        }
+        case "register" -> {
+          if (handleRegistration(args)) {
+            postLogin.run();
+            // After logout, loop continues
+          }
+        }
         default -> System.out.println("Unknown command - try 'help'");
       }
     }
-
-    postLogin.run();
   }
 
   private boolean handleLogin(String[] args) {
@@ -65,10 +75,10 @@ public class PreLoginREPL {
 
   private void printCommands() {
     System.out.println("""
-            Available commands:
-            login <username> <password>
-            register <username> <password> <email>
-            help
-            quit""");
+                Available commands:
+                login <username> <password>
+                register <username> <password> <email>
+                help
+                quit""");
   }
 }

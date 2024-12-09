@@ -8,15 +8,15 @@ import java.util.*;
 public class PostLoginREPL {
   private final ServerFacade facade;
   private final List<GameData> gameCache;
-  private boolean active;
+  private boolean active = true;
 
   public PostLoginREPL(ServerFacade facade) {
     this.facade = facade;
     this.gameCache = new ArrayList<>();
-    this.active = true;
   }
 
   public void run() {
+    active = true;
     var scanner = new Scanner(System.in);
     while (active) {
       System.out.print("\n[IN] >> ");

@@ -48,6 +48,13 @@ public class WebSocketDecoder {
             }).create();
   }
 
+  @OnOpen
+  public void onOpen(Session session) {
+    System.out.println("\n✅ [WS-DEBUG] onOpen called");
+    System.out.println("  - Session ID: " + session.getId());
+    connectLatch.countDown();
+  }
+
   public void connect() throws Exception {
     System.out.println("\n🔍 [WS-DEBUG] Starting connection process...");
     System.out.println("🔍 [WS-DEBUG] Server URL: " + serverUrl);
