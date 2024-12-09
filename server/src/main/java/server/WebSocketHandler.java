@@ -359,9 +359,6 @@ public class WebSocketHandler {
         }
       });
     }
-    //session = null;
-    // this.remote = null;
-    //super.onWebSocketClose(statusCode, reason);
   }
 
   @OnWebSocketError
